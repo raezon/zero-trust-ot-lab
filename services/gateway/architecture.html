@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zero-Trust OT — Architecture animée</title>
+<style>
+  :root{
+    --bg:#0b0f16; --panel:#141b25; --border:#26303d; --txt:#e6edf3; --muted:#8b949e;
+    --it:#3b82f6; --dmz:#a855f7; --ot:#14b8a6;
+    --idle:#3a4553; --compromis:#ef4444; --expose:#f59e0b; --bloque:#22c55e;
+    --active:#38bdf8; --safe:#22c55e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;
+    align-items:center;gap:14px;flex-wrap:wrap}
+  header h1{font-size:18px;margin:0;font-weight:650}
+  .modes{margin-left:auto;display:flex;gap:8px}
+  .modes button{background:var(--panel);color:var(--muted);border:1px solid var(--border);
+    padding:7px 14px;border-radius:20px;font-weight:650;cursor:pointer;font-size:13px}
+  .modes button.on[data-mode="flat"]{background:rgba(239,68,68,.15);color:#f87171;border-color:#ef444455}
+  .modes button.on[data-mode="zt"]{background:rgba(34,197,94,.15);color:#4ade80;border-color:#22c55e55}
+  .wrap{max-width:1180px;margin:0 auto;padding:16px}
+  .stage{position:relative;background:var(--panel);border:1px solid var(--border);
+    border-radius:14px;overflow:hidden;height:min(70vh,720px)}
+  svg{display:block;width:100%;height:100%}
+  .controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0}
+  .controls button{background:#1f2a37;color:var(--txt);border:1px solid var(--border);
+    padding:9px 16px;border-radius:9px;font-weight:650;cursor:pointer;font-size:14px}
+  .controls button:hover{border-color:#3b82f6}
+  .controls button.primary{background:#2563eb;border-color:#2563eb}
+  .controls button:disabled{opacity:.4;cursor:default}
+  .step-ind{color:var(--muted);font-size:13px;margin-left:auto}
+  .caption{background:var(--panel);border:1px solid var(--border);border-left:4px solid var(--active);
+    border-radius:10px;padding:14px 16px;min-height:64px;font-size:15px;line-height:1.5}
+  .caption .tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.5px;
+    text-transform:uppercase;padding:2px 8px;border-radius:10px;margin-right:8px;vertical-align:1px}
+  .verdict{margin-top:12px;border-radius:10px;padding:14px 16px;font-weight:650;font-size:15px;display:none}
+  .verdict.ok{display:block;background:rgba(34,197,94,.12);border:1px solid #22c55e55;color:#86efac}
+  .verdict.ko{display:block;background:rgba(239,68,68,.12);border:1px solid #ef444455;color:#fca5a5}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:12px}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:11px;height:11px;border-radius:3px;display:inline-block}
+  text{font-family:system-ui,sans-serif}
+</style>
+</head>
+<body>
+<header>
+  <h1>🛡️ Zero-Trust OT — propagation d'une attaque IT → OT (modèle de Purdue)</h1>
+  <div class="modes">
+    <button data-mode="flat">Réseau plat</button>
+    <button data-mode="zt" class="on">Zero-Trust</button>
+  </div>
+</header>
+
+<!-- ================= ÉCRAN DE CONNEXION (identification) ================= -->
+<div id="gate" class="gate">
+  <div class="gate-card">
+    <h2>🔐 Accès au lab Zero-Trust OT</h2>
+    <p>Identifie-toi pour démarrer l'exercice. Ta progression et ta note seront
+       enregistrées et transmises au formateur.</p>
+    <label>Nom et prénom<input id="g-name" autocomplete="off" placeholder="ex. Amine Bensalem"></label>
+    <label>E-mail<input id="g-email" type="email" autocomplete="off" placeholder="prenom.nom@ecole.fr"></label>
+    <label>Groupe / classe<input id="g-group" autocomplete="off" placeholder="ex. M2-BLOC2-A"></label>
+    <button id="g-go">Commencer l'exercice →</button>
+    <div id="g-err" class="gate-err"></div>
+    <p class="gate-note">Aucun mot de passe : simple identification pédagogique.</p>
+  </div>
+</div>
+
+<div class="wrap">
+  <!-- Bandeau étudiant + progression -->
+  <div class="learner" id="learner" style="display:none">
+    <div class="learner-who"><b id="who-name">—</b><span id="who-group" class="l-muted"></span></div>
+    <div class="progress-wrap">
+      <div class="progress-bar"><div id="progress-fill"></div></div>
+      <span id="progress-txt" class="score">0 / 0</span>
+    </div>
+    <button id="objs-toggle" class="mini">Objectifs ▾</button>
+    <button id="submit-btn" class="mini primary">Soumettre ma note</button>
+  </div>
+  <div id="objs" class="objs" style="display:none"></div>
+
+  <div class="stage"><svg id="net" viewBox="0 0 1000 660" preserveAspectRatio="xMidYMid meet"></svg></div>
+
+  <div class="controls">
+    <button id="play" class="primary">▶ Lancer l'attaque</button>
+    <button id="step">⏭ Étape suivante</button>
+    <button id="restart">↺ Rejouer</button>
+    <span class="step-ind" id="ind">étape 0 / 0</span>
+  </div>
+
+  <div class="caption" id="caption">Choisissez un mode puis lancez l'attaque. Le pirate part
+    d'Internet ; sa trame se propage de nœud en nœud jusqu'à ce qu'elle atteigne le procédé…
+    ou soit stoppée.</div>
+  <div class="verdict" id="verdict"></div>
+
+  <div class="legend">
+    <span><i class="dot" style="background:var(--idle)"></i>sain</span>
+    <span><i class="dot" style="background:var(--compromis)"></i>compromis</span>
+    <span><i class="dot" style="background:var(--expose)"></i>données exposées</span>
+    <span><i class="dot" style="background:var(--active)"></i>passerelle sollicitée</span>
+    <span><i class="dot" style="background:var(--bloque)"></i>attaque bloquée</span>
+    <span><i class="dot" style="background:var(--safe)"></i>procédé protégé</span>
+  </div>
+
+  <!-- ================= TERMINAL INTERACTIF ================= -->
+  <div class="term">
+    <div class="term-head">
+      <span class="tdot r"></span><span class="tdot y"></span><span class="tdot g"></span>
+      <span class="term-title">Terminal de l'attaquant · poste compromis de j.durand — bac à sable pédagogique</span>
+      <span class="term-sess" id="sess"></span>
+    </div>
+    <div class="term-body" id="out"></div>
+    <div class="term-input">
+      <span class="ps1" id="ps1">atk@poste-jdurand:~$</span>
+      <input id="cmd" autocomplete="off" spellcheck="false" placeholder="tapez  help  puis  mission  pour démarrer…">
+    </div>
+  </div>
+</div>
+
+<style>
+  .term{margin-top:22px;background:#0a0e14;border:1px solid var(--border);border-radius:12px;
+    overflow:hidden;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .term-head{display:flex;align-items:center;gap:7px;padding:9px 14px;background:#11161f;
+    border-bottom:1px solid var(--border)}
+  .tdot{width:11px;height:11px;border-radius:50%}
+  .tdot.r{background:#ff5f56}.tdot.y{background:#ffbd2e}.tdot.g{background:#27c93f}
+  .term-title{margin-left:8px;font-size:12px;color:var(--muted)}
+  .term-sess{margin-left:auto;font-size:11px;color:#7dd3fc}
+  .term-body{padding:14px 16px;height:300px;overflow:auto;font-size:13px;line-height:1.55;
+    white-space:pre-wrap;word-break:break-word}
+  .term-input{display:flex;gap:8px;align-items:center;padding:10px 16px;border-top:1px solid var(--border);
+    background:#0a0e14}
+  .ps1{color:#4ade80;font-size:13px;white-space:nowrap}
+  #cmd{flex:1;background:transparent;border:0;outline:0;color:var(--txt);font:inherit;font-size:13px}
+  .l-ok{color:#4ade80}.l-deny{color:#f87171}.l-info{color:#7dd3fc}.l-warn{color:#fbbf24}
+  .l-cmd{color:#e6edf3}.l-muted{color:#8b949e}.l-loot{color:#fca5a5}.l-hint{color:#a78bfa}
+  .term-body b{color:#fff}
+</style>
+
+<script>
+// ===================== TERMINAL (attaque réelle, sandbox) ================== //
+(function(){
+  const out=document.getElementById('out'), inp=document.getElementById('cmd'),
+        sessEl=document.getElementById('sess');
+  const S={token:null, role:null, zone:'it', posture:'unmanaged'};
+  const KNOWN={  // "butin" d'identifiants récupérés sur le poste (démo)
+    'tok-admin-it':'admin_it (IT)', 'tok-operator-ot':'operator_ot (OT)',
+    'tok-maintenance':'maintenance (prestataire)', 'tok-expire':'operator_ot (EXPIRÉ)'};
+  const hist=[]; let hi=0;
+
+  function line(txt,cls){ const d=document.createElement('div'); if(cls)d.className=cls;
+    d.innerHTML=txt; out.appendChild(d); out.scrollTop=out.scrollHeight; }
+  const prog=id=>{ if(window.LAB && window.LAB.student && window.LAB.student()) window.LAB.progress(id); };
+  function updSess(){ sessEl.textContent = S.token
+    ? `jeton:${S.token} · zone:${S.zone} · poste:${S.posture}`
+    : 'aucun jeton — utilisez  use <jeton>'; }
+
+  const CMDS={
+    // action, target, hint
+    'read metrics'  :{a:'READ_METRICS',  t:'scada'}, 'read sensors':{a:'READ_SENSORS', t:'plc'},
+    'read state'    :{a:'READ_STATE',    t:'plc'},   'read program':{a:'READ_PROGRAM', t:'plc'},
+    'export recipes':{a:'EXPORT_RECIPES',t:'scada'}, 'read topology':{a:'READ_TOPOLOGY',t:'scada'},
+    'open valve'    :{a:'OPEN_VALVE',    t:'plc'},   'close valve':{a:'CLOSE_VALVE',    t:'plc'},
+    'stop line'     :{a:'STOP_LINE',     t:'plc'},   'start line':{a:'START_LINE',      t:'plc'},
+  };
+
+  function help(){
+    line("Commandes disponibles :", 'l-info');
+    line(
+`  <b>mission</b>              rappel du scénario et objectifs
+  <b>tokens</b>               identifiants récupérés sur le poste
+  <b>whoami</b>               que vaut mon jeton (interroge l'IAM)
+  <b>scan</b>                 sonde le réseau depuis ce poste (segmentation)
+  <b>use</b> &lt;jeton&gt;          endosse un jeton volé
+  <b>set zone</b> &lt;zone&gt;      it | dmz | ot_supervision | ot_terrain
+  <b>set posture</b> &lt;p&gt;      managed | unmanaged
+  <b>read metrics|sensors|state|program</b>   tenter une lecture
+  <b>export recipes | read topology</b>       tenter une exfiltration
+  <b>open valve | close valve | stop line | start line</b>   agir sur le procédé
+  <b>set setpoint</b> &lt;C&gt;     modifier la consigne de chauffe
+  <b>status</b>               état de session · <b>clear</b> · <b>reset</b>`, 'l-muted');
+  }
+  function mission(){
+    line("── MISSION (exercice) ──────────────────────────────", 'l-info');
+    line(
+`Vous avez hameçonné j.durand et récupéré son poste + un jeton IT.
+Objectif : atteindre le procédé physique (ouvrir la vanne V-101)
+et voir quelles DONNÉES vous pouvez exfiltrer.
+
+# Étape 1 : voyez ce que vaut votre accès      ->  whoami  puis  scan
+# Étape 2 : tentez l'action physique            ->  open valve
+# Étape 3 : le PDP refuse ? lisez le motif et ADAPTEZ le contexte
+#           (rôle via 'use', zone via 'set zone', poste via 'set posture')
+# Étape 4 : récupérez ce qui est lisible         ->  read sensors / read metrics
+Chaque refus vous dit QUEL principe Zero-Trust vous bloque.`, 'l-muted');
+  }
+  function tokens(){
+    line("Identifiants trouvés sur le poste (réutilisables avec  use <jeton>) :", 'l-info');
+    for(const k in KNOWN) line(`  ${k.padEnd(18)} → ${KNOWN[k]}`, 'l-loot');
+  }
+
+  async function whoami(){
+    if(!S.token){ line("Aucun jeton. Faites  use tok-admin-it", 'l-warn'); return; }
+    try{
+      const r=await fetch('whoami',{headers:{'Authorization':'Bearer '+S.token}});
+      const j=await r.json();
+      if(!j.valid){ line("Jeton invalide / inconnu de l'IAM.", 'l-deny'); return; }
+      const id=j.identity||{};
+      line(`Identité : ${id.user} · rôle ${id.role} · zone d'origine ${id.home_zone}`
+           + (j.expired?'  [EXPIRÉ]':'  [valide]'), j.expired?'l-warn':'l-ok');
+      prog('identite');
+      if(j.expired) line("# indice : jeton expiré → 'Vérifier en continu' le refusera. Prenez un autre jeton.", 'l-hint');
+    }catch(e){ line("Passerelle injoignable.", 'l-deny'); }
+  }
+
+  async function scan(){
+    line("Sonde du réseau depuis le poste IT…", 'l-info');
+    line("  gateway:8088  … ATTEIGNABLE  (le conduit est exposé)", 'l-ok');
+    // tentative directe vers l'OT : non exposé à l'hôte -> échoue = segmentation
+    for(const [n,p] of [['plc','8081'],['scada','8082']]){
+      try{
+        await fetch(`http://localhost:${p}/health`,{signal:AbortSignal.timeout(900)});
+        line(`  ${n}:${p} … ATTEIGNABLE`, 'l-deny');
+      }catch(e){
+        line(`  ${n} (OT) … INJOIGNABLE — microsegmentation : aucun conduit direct IT→OT`, 'l-ok');
+      }
+    }
+    wallG.setAttribute('opacity',1);
+    edgeEls['poste>plc'].setAttribute('stroke-opacity',1);
+    setNode('poste','compromis'); flash('poste');
+    line("# vous êtes contraint de passer par la passerelle → tentez  open valve", 'l-hint');
+    prog('reconnaissance');
+  }
+
+  function hintFor(principle, action){
+    const p=(principle||'').toLowerCase();
+    const eng=['EXPORT_RECIPES','READ_TOPOLOGY','READ_PROGRAM'].includes(action);
+    if(p.includes('continu')) return "# jeton expiré : prenez un jeton non expiré (use tok-admin-it).";
+    if(p.includes('moindre') && eng)
+      return "# donnée d'ingénierie : AUCUN rôle ne peut la lire via la passerelle. Elle exige un accès local OT — la propriété intellectuelle reste protégée.";
+    if(p.includes('moindre')) return "# ce rôle n'a pas ce droit. Un opérateur OT peut agir : use tok-operator-ot.";
+    if(p.includes('compromission')) return "# commande refusée depuis cette zone. set zone ot_supervision.";
+    if(p.includes('explicit')) return S.token
+      ? "# poste non maîtrisé pour une action sensible : set posture managed."
+      : "# aucune identité : use <jeton>.";
+    return "# adaptez rôle / zone / posture d'après le motif.";
+  }
+
+  async function command(action,target){
+    if(!S.token){ line("Aucun jeton. Faites  use tok-admin-it", 'l-warn'); return; }
+    let body={target,action,params:{}};
+    if(action==='SET_SETPOINT') body.params.value=window.__sp||90;
+    try{
+      const r=await fetch('command',{method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+S.token,
+                 'X-Source-Zone':S.zone,'X-Device-Posture':S.posture},
+        body:JSON.stringify(body)});
+      const j=await r.json();
+      setNode('gateway','active');
+      if(r.status===403 || j.decision==='DENY'){
+        line(`DENY · ${j.principle} — ${j.reason}`, 'l-deny');
+        flash('gateway');
+        caption('block', `<b>DENY</b> (${j.principle}) : ${j.reason}`);
+        line(hintFor(j.principle,action), 'l-hint');
+        if((j.principle||'').toLowerCase().includes('moindre') && action==='OPEN_VALVE') prog('refus_privilege');
+        if(action==='EXPORT_RECIPES') prog('protection_pi');
+        return;
+      }
+      // ALLOW
+      const res=j.result||{};
+      const procede=['OPEN_VALVE','CLOSE_VALVE','STOP_LINE','START_LINE','SET_SETPOINT'].includes(action);
+      line(`ALLOW · ${j.reason}`, 'l-ok');
+      if(res.message) line("  » "+res.message, procede?'l-warn':'l-ok');
+      if(res.capteurs){ line("  BUTIN — télémétrie capteurs récupérée :", 'l-loot');
+        res.capteurs.forEach(c=>line(`     ${c.tag}  ${c.type.padEnd(12)} ${c.valeur} ${c.unite}`, 'l-loot')); }
+      if(res.metrics){ line("  BUTIN — métriques SCADA :", 'l-loot');
+        for(const k in res.metrics) line(`     ${k} = ${res.metrics[k]}`, 'l-loot'); }
+      if(res.state){ const s=res.state;
+        line(`  état procédé : cuve ${s.tank_level_pct}% · ${s.temperature_C}C · ${s.pressure_bar}bar · débit ${s.flow_m3h}`, 'l-muted');
+        if(s.alarmes&&s.alarmes.length) s.alarmes.forEach(a=>line("  ⚠ "+a,'l-deny')); }
+      // réactions du schéma
+      if(action==='OPEN_VALVE'){ setNode('plc','compromis'); setNode('valve','compromis'); flash('valve');
+        caption('danger','<b>Action physique réussie</b> : la vanne V-101 est ouverte. Le pirate contrôle le procédé.');
+        prog('attaque_physique'); }
+      else if(action==='READ_SENSORS'){ prog('exfiltration'); }
+      else if(action==='STOP_LINE'){ setNode('plc','compromis'); flash('plc');
+        caption('danger','<b>Sabotage</b> : la ligne de production est arrêtée.'); }
+      else if(procede){ setNode('plc','compromis'); }
+      else { setNode(target,'expose'); flash(target);
+        caption('warn','<b>Données exposées</b> : lecture autorisée pour ce rôle — le pirate exfiltre de la télémétrie.'); }
+    }catch(e){ line("Passerelle injoignable : "+e.name, 'l-deny'); }
+  }
+
+  async function run(raw){
+    const c=raw.trim(); if(!c) return;
+    line(`<span class="l-muted">${document.getElementById('ps1').textContent}</span> <span class="l-cmd">${c.replace(/</g,'&lt;')}</span>`);
+    const low=c.toLowerCase();
+    if(low==='help'){ help(); return; }
+    if(low==='mission'){ mission(); return; }
+    if(low==='tokens'){ tokens(); return; }
+    if(low==='whoami'){ await whoami(); return; }
+    if(low==='scan'){ await scan(); return; }
+    if(low==='status'){ line(`jeton=${S.token||'—'} rôle=${S.role||'—'} zone=${S.zone} posture=${S.posture}`,'l-info'); return; }
+    if(low==='clear'){ out.innerHTML=''; return; }
+    if(low==='reset'){ S.token=S.role=null; S.zone='it'; S.posture='unmanaged'; updSess();
+      line("Session réinitialisée (jeton IT volé, zone it, poste unmanaged).",'l-info'); return; }
+    if(low.startsWith('use ')){ const t=c.slice(4).trim();
+      if(!KNOWN[t]){ line("Jeton inconnu. Voir  tokens",'l-warn'); return; }
+      S.token=t; S.role=KNOWN[t]; updSess(); line(`Jeton endossé : ${t} (${KNOWN[t]})`,'l-ok');
+      line("# vérifiez-le :  whoami",'l-hint'); return; }
+    if(low.startsWith('set zone ')){ S.zone=c.slice(9).trim(); updSess(); line(`zone = ${S.zone}`,'l-ok'); return; }
+    if(low.startsWith('set posture ')){ S.posture=c.slice(12).trim(); updSess(); line(`posture = ${S.posture}`,'l-ok'); return; }
+    if(low.startsWith('set setpoint ')){ window.__sp=parseFloat(c.slice(13))||90; await command('SET_SETPOINT','plc'); return; }
+    if(CMDS[low]){ await command(CMDS[low].a, CMDS[low].t); return; }
+    line(`commande inconnue : ${c} — tapez  help`, 'l-warn');
+  }
+
+  inp.addEventListener('keydown',async e=>{
+    if(e.key==='Enter'){ const v=inp.value; inp.value=''; if(v.trim()){hist.push(v);hi=hist.length;} await run(v); }
+    else if(e.key==='ArrowUp'){ if(hi>0){hi--;inp.value=hist[hi]||'';} e.preventDefault(); }
+    else if(e.key==='ArrowDown'){ if(hi<hist.length){hi++;inp.value=hist[hi]||'';} e.preventDefault(); }
+  });
+
+  updSess();
+  line("Poste de j.durand compromis. Session ouverte avec un jeton IT volé.", 'l-info');
+  line("Tapez  <b>help</b>  pour les commandes, ou  <b>mission</b>  pour le scénario.", 'l-muted');
+})();
+</script>
+
+<script>
+const NS="http://www.w3.org/2000/svg";
+const svg=document.getElementById("net");
+const el=(t,a={})=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e;};
+
+// ---- Bandes (niveaux Purdue) --------------------------------------------- //
+const BANDS=[
+  {y:24, h:174, label:"NIVEAUX 4-5 · ZONE IT (bureautique, Internet)", c:"var(--it)"},
+  {y:210,h:96,  label:"DMZ INDUSTRIELLE · conduit unique", c:"var(--dmz)"},
+  {y:318,h:120, label:"NIVEAU 3 · SUPERVISION OT (SCADA / historian)", c:"var(--ot)"},
+  {y:450,h:186, label:"NIVEAUX 0-1 · TERRAIN OT (automate, procédé)", c:"var(--ot)"},
+];
+// ---- Noeuds --------------------------------------------------------------- //
+const NODES={
+  hacker :{x:70, y:95, w:96, h:60, icon:"🏴‍☠️", nm:"Attaquant", sub:"externe"},
+  net    :{x:210,y:95, w:96, h:60, icon:"☁️", nm:"Internet", sub:"e-mail piégé"},
+  mail   :{x:400,y:70, w:120,h:56, icon:"✉️", nm:"Serveur mail", sub:"passerelle SMTP"},
+  poste  :{x:400,y:150,w:130,h:56, icon:"💻", nm:"Poste j.durand", sub:"IT · admin_it"},
+  poste2 :{x:640,y:70, w:120,h:56, icon:"💻", nm:"Poste RH", sub:"bureautique"},
+  poste3 :{x:640,y:150,w:120,h:56, icon:"🖥️", nm:"ERP / AD", sub:"annuaire"},
+  gateway:{x:500,y:258,w:150,h:60, icon:"🛡️", nm:"Passerelle PEP/PDP", sub:"authentifie · décide"},
+  scada  :{x:300,y:378,w:130,h:56, icon:"🖥️", nm:"SCADA", sub:"recettes · métriques"},
+  hist   :{x:490,y:378,w:120,h:56, icon:"🗄️", nm:"Historian", sub:"journalisation"},
+  hmi    :{x:700,y:378,w:110,h:56, icon:"📟", nm:"IHM", sub:"salle contrôle"},
+  plc    :{x:400,y:545,w:130,h:56, icon:"⚙️", nm:"Automate PLC", sub:"PLC-N1-01"},
+  valve  :{x:660,y:545,w:130,h:56, icon:"🚰", nm:"Vanne V-101", sub:"procédé physique"},
+};
+// ---- Liens (réseau) ------------------------------------------------------- //
+const EDGES=[
+  ["hacker","net"],["net","mail"],["mail","poste"],
+  ["poste","poste2","weak"],["poste","poste3","weak"],
+  ["poste","gateway"],
+  ["gateway","scada"],["gateway","hist"],["gateway","hmi"],["gateway","plc"],
+  ["plc","valve"],
+  ["poste","plc","direct"],   // tentative directe IT->OT (contournement)
+];
+const WALL={x:400,y:262};    // mur de segmentation sur le lien direct poste->plc
+
+// ---- Rendu statique ------------------------------------------------------- //
+const gEdges=el("g"), gNodes=el("g"), gFx=el("g");
+svg.appendChild(gEdges); svg.appendChild(gNodes); svg.appendChild(gFx);
+
+BANDS.forEach(b=>{
+  svg.insertBefore(el("rect",{x:14,y:b.y,width:972,height:b.h,rx:12,
+    fill:"rgba(255,255,255,.02)",stroke:b.c,"stroke-opacity":".35","stroke-dasharray":"2 6"}),gEdges);
+  const t=el("text",{x:26,y:b.y+18,fill:b.c,"font-size":11,"font-weight":700,"letter-spacing":".5",opacity:.8});
+  t.textContent=b.label; svg.insertBefore(t,gEdges);
+});
+
+function anchor(id){const n=NODES[id];return {x:n.x,y:n.y};}
+const edgeEls={};
+EDGES.forEach(([a,b,kind])=>{
+  const p=anchor(a),q=anchor(b);
+  const line=el("line",{x1:p.x,y1:p.y,x2:q.x,y2:q.y,
+    stroke:kind==="direct"?"#f87171":"#3a4553",
+    "stroke-width":kind==="direct"?2:2.5,
+    "stroke-opacity":kind==="weak"?.25:(kind==="direct"?.5:.6),
+    "stroke-dasharray":kind==="direct"?"7 6":"none","stroke-linecap":"round"});
+  gEdges.appendChild(line); edgeEls[a+">"+b]=line;
+});
+
+const nodeEls={};
+for(const id in NODES){
+  const n=NODES[id];
+  const g=el("g",{transform:`translate(${n.x-n.w/2},${n.y-n.h/2})`});
+  const r=el("rect",{width:n.w,height:n.h,rx:11,fill:"#1a2230",stroke:"var(--idle)","stroke-width":2});
+  const ic=el("text",{x:14,y:n.h/2+7,"font-size":22}); ic.textContent=n.icon;
+  const nm=el("text",{x:42,y:n.h/2-2,fill:"var(--txt)","font-size":12.5,"font-weight":700}); nm.textContent=n.nm;
+  const sb=el("text",{x:42,y:n.h/2+14,fill:"var(--muted)","font-size":10.5}); sb.textContent=n.sub;
+  const badge=el("text",{x:n.w-8,y:15,fill:"var(--muted)","font-size":9.5,"font-weight":700,
+    "text-anchor":"end","letter-spacing":".4"}); badge.textContent="";
+  g.append(r,ic,nm,sb,badge); gNodes.appendChild(g);
+  nodeEls[id]={g,r,badge};
+}
+
+// mur de segmentation (masqué au départ)
+const wallG=el("g",{opacity:0});
+wallG.appendChild(el("rect",{x:WALL.x-26,y:WALL.y-13,width:52,height:26,rx:5,fill:"#7f1d1d",stroke:"#ef4444"}));
+const wt=el("text",{x:WALL.x,y:WALL.y+5,"text-anchor":"middle","font-size":15}); wt.textContent="🧱";
+wallG.appendChild(wt); gFx.appendChild(wallG);
+
+const STATE_COLOR={idle:"var(--idle)",compromis:"var(--compromis)",expose:"var(--expose)",
+  active:"var(--active)",bloque:"var(--bloque)",safe:"var(--safe)"};
+const STATE_LABEL={compromis:"COMPROMIS",expose:"EXPOSÉ",active:"PEP",bloque:"BLOQUÉ",safe:"PROTÉGÉ"};
+function setNode(id,state){
+  const e=nodeEls[id]; if(!e)return;
+  e.r.setAttribute("stroke",STATE_COLOR[state]||"var(--idle)");
+  e.r.setAttribute("fill", state&&state!=="idle" ? hexBg(state) : "#1a2230");
+  e.badge.setAttribute("fill",STATE_COLOR[state]||"var(--muted)");
+  e.badge.textContent=STATE_LABEL[state]||"";
+}
+function hexBg(s){return {compromis:"#2a1518",expose:"#2a2312",active:"#0f2733",
+  bloque:"#122a1a",safe:"#122a1a"}[s]||"#1a2230";}
+
+// ---- Animation de la trame ------------------------------------------------ //
+const pulse=el("circle",{r:7,fill:"#fff",opacity:0,filter:""}); gFx.appendChild(pulse);
+const halo =el("circle",{r:7,fill:"none",stroke:"#fff","stroke-width":2,opacity:0}); gFx.appendChild(halo);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+function travel(a,b,{stopT=1,color="#f87171",dur=850}={}){
+  return new Promise(res=>{
+    const p=anchor(a),q=anchor(b);
+    pulse.setAttribute("fill",color); halo.setAttribute("stroke",color);
+    const t0=performance.now();
+    (function frame(now){
+      let t=Math.min(1,(now-t0)/dur)*stopT;
+      const x=p.x+(q.x-p.x)*t, y=p.y+(q.y-p.y)*t;
+      [pulse,halo].forEach(c=>{c.setAttribute("cx",x);c.setAttribute("cy",y);c.setAttribute("opacity",1);});
+      halo.setAttribute("r",7+8*(( (now/300)%1)));
+      halo.setAttribute("opacity",.6-.6*(((now/300)%1)));
+      if((now-t0)/dur<1) requestAnimationFrame(frame);
+      else { pulse.setAttribute("opacity",0); res(); }
+    })(t0);
+  });
+}
+function flash(id,color){
+  const e=nodeEls[id]; if(!e)return;
+  e.r.animate([{strokeWidth:2},{strokeWidth:6},{strokeWidth:2}],{duration:600});
+}
+
+// ---- Scénarios ------------------------------------------------------------ //
+const TAGS={danger:["#f87171","rgba(239,68,68,.15)"],block:["#4ade80","rgba(34,197,94,.15)"],
+  info:["#38bdf8","rgba(56,189,248,.15)"],warn:["#fbbf24","rgba(245,158,11,.15)"]};
+function caption(tag,txt){
+  const [c,bg]=TAGS[tag]; const box=document.getElementById("caption");
+  box.style.borderLeftColor=c;
+  box.innerHTML=`<span class="tag" style="color:${c};background:${bg}">${tag==="danger"?"attaque":tag==="block"?"défense":tag==="warn"?"fuite":"info"}</span>${txt}`;
+}
+
+const SCENARIOS={
+  zt:[
+    {run:async()=>{
+      caption("danger","Hameçonnage : le pirate envoie un e-mail piégé. j.durand l'ouvre — son poste IT est pris et son identifiant volé.");
+      await travel("hacker","net",{color:"#f87171"});
+      await travel("net","mail",{color:"#f87171"});
+      await travel("mail","poste",{color:"#f87171"});
+      setNode("poste","compromis"); flash("poste");
+    }},
+    {run:async()=>{
+      caption("block","Depuis le poste, il tente d'atteindre DIRECTEMENT l'automate. La microsegmentation réseau l'arrête : côté IT, l'OT n'existe même pas.");
+      edgeEls["poste>plc"].setAttribute("stroke-opacity",1);
+      await travel("poste","plc",{stopT:.29,color:"#f87171",dur:700});
+      wallG.animate([{opacity:0},{opacity:1}],{duration:400,fill:"forwards"});
+      wallG.setAttribute("opacity",1);
+    }},
+    {run:async()=>{
+      caption("info","Contraint, il passe par la passerelle (seul conduit) et présente le jeton IT volé — identité valide.");
+      await travel("poste","gateway",{color:"#38bdf8"});
+      setNode("gateway","active"); flash("gateway");
+    }},
+    {run:async()=>{
+      caption("block","Commande OPEN_VALVE → <b>DENY</b>. Moindre privilège : le rôle admin_it n'a pas ce droit, et une commande procédé ne peut venir de la zone IT.");
+      await travel("gateway","plc",{stopT:.18,color:"#f87171",dur:600});
+      flash("gateway");
+    }},
+    {run:async()=>{
+      caption("warn","Il se rabat sur la lecture des métriques → <b>ALLOW</b>. Le jeton volé n'obtient QUE ce que son rôle permet : de la supervision en lecture, jamais le contrôle du procédé.");
+      await travel("gateway","scada",{color:"#f59e0b"});
+      setNode("scada","expose"); flash("scada");
+    }},
+    {verdict:["ok","🛡️ Attaque neutralisée. Deux barrières indépendantes ont tenu : la <b>segmentation réseau</b> puis la <b>politique Zero-Trust</b> du PEP/PDP. Le procédé physique est intact.","valve","safe"]},
+  ],
+  flat:[
+    {run:async()=>{
+      caption("danger","Hameçonnage : le poste de j.durand est compromis et son identifiant volé.");
+      await travel("hacker","net",{color:"#f87171"});
+      await travel("net","mail",{color:"#f87171"});
+      await travel("mail","poste",{color:"#f87171"});
+      setNode("poste","compromis"); flash("poste");
+    }},
+    {run:async()=>{
+      caption("danger","Réseau plat : aucune segmentation. Le poste IT joint DIRECTEMENT l'automate — aucun conduit ne l'en empêche.");
+      edgeEls["poste>plc"].setAttribute("stroke-opacity",1);
+      edgeEls["poste>plc"].setAttribute("stroke","#ef4444");
+      await travel("poste","plc",{color:"#ef4444",dur:1000});
+      setNode("plc","compromis"); flash("plc");
+    }},
+    {run:async()=>{
+      caption("danger","L'attaquant envoie OPEN_VALVE. L'automate exécute : la vanne s'ouvre. Le procédé physique est impacté.");
+      await travel("plc","valve",{color:"#ef4444"});
+      setNode("valve","compromis"); flash("valve");
+    }},
+    {verdict:["ko","❌ Échec de sécurité. Le château-fort est tombé dès la première brèche : une fois à l'intérieur, plus aucun obstacle jusqu'à la vanne.","",""]},
+  ],
+};
+
+// ---- Contrôleur ----------------------------------------------------------- //
+let mode="zt", steps=SCENARIOS[mode], idx=0, playing=false, busy=false;
+const $=id=>document.getElementById(id);
+
+function reset(){
+  playing=false; busy=false; idx=0;
+  for(const id in NODES) setNode(id,"idle");
+  setNode("valve","idle");
+  wallG.setAttribute("opacity",0);
+  edgeEls["poste>plc"].setAttribute("stroke-opacity",.5);
+  edgeEls["poste>plc"].setAttribute("stroke","#f87171");
+  pulse.setAttribute("opacity",0); halo.setAttribute("opacity",0);
+  $("verdict").className="verdict"; $("verdict").innerHTML="";
+  $("play").textContent="▶ Lancer l'attaque";
+  caption("info", mode==="zt"
+    ? "Mode Zero-Trust : réseaux segmentés, passerelle PEP/PDP. Lancez l'attaque et suivez la trame."
+    : "Mode réseau plat : tout le monde parle à tout le monde. Lancez l'attaque et suivez la trame.");
+  updInd();
+}
+function updInd(){ $("ind").textContent=`étape ${idx} / ${steps.length}`; }
+
+async function doStep(){
+  if(busy || idx>=steps.length) return false;
+  busy=true;
+  const s=steps[idx];
+  if(s.verdict){
+    const [cls,txt,node,st]=s.verdict;
+    $("verdict").className="verdict "+cls; $("verdict").innerHTML=txt;
+    if(node) setNode(node,st);
+  } else { await s.run(); }
+  idx=Math.min(idx+1,steps.length); updInd(); busy=false;
+  return idx<steps.length;
+}
+
+async function play(){
+  if(playing){ playing=false; $("play").textContent="▶ Reprendre"; return; }
+  if(idx>=steps.length) reset();
+  playing=true; $("play").textContent="⏸ Pause";
+  while(playing && idx<steps.length){ const more=await doStep(); await sleep(650); if(!more)break; }
+  playing=false;
+  $("play").textContent = idx>=steps.length ? "↺ Rejouer" : "▶ Reprendre";
+}
+
+$("play").onclick=()=>{ if(idx>=steps.length){reset();play();} else play(); };
+$("step").onclick=async()=>{ playing=false; $("play").textContent="▶ Reprendre"; if(idx>=steps.length)reset(); await doStep(); };
+$("restart").onclick=reset;
+document.querySelectorAll(".modes button").forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll(".modes button").forEach(x=>x.classList.remove("on"));
+    b.classList.add("on");
+    mode=b.dataset.mode==="flat"?"flat":"zt"; steps=SCENARIOS[mode]; reset();
+  };
+});
+reset();
+</script>
+
+<style>
+  .gate{position:fixed;inset:0;z-index:1000;background:rgba(6,9,14,.92);
+    backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:16px}
+  .gate.hidden{display:none}
+  .gate-card{background:var(--panel);border:1px solid var(--border);border-radius:16px;
+    padding:26px 26px 20px;max-width:420px;width:100%}
+  .gate-card h2{margin:0 0 6px;font-size:20px}
+  .gate-card p{color:var(--muted);font-size:13.5px;margin:0 0 16px}
+  .gate-card label{display:block;font-size:12px;color:var(--muted);margin:12px 0 0;font-weight:600}
+  .gate-card input{width:100%;margin-top:5px;background:#0d1420;border:1px solid var(--border);
+    border-radius:9px;padding:10px 12px;color:var(--txt);font:inherit;font-size:14px;outline:none}
+  .gate-card input:focus{border-color:#2563eb}
+  #g-go{width:100%;margin-top:18px;background:#2563eb;border:0;color:#fff;font-weight:700;
+    padding:12px;border-radius:10px;cursor:pointer;font-size:15px}
+  .gate-err{color:#f87171;font-size:13px;margin-top:10px;min-height:18px}
+  .gate-note{margin-top:12px !important;font-size:11.5px}
+  .learner{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--panel);
+    border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:14px}
+  .learner-who b{font-size:14px}.learner-who span{margin-left:8px;font-size:12px}
+  .progress-wrap{display:flex;align-items:center;gap:10px;flex:1;min-width:180px}
+  .progress-bar{flex:1;height:10px;background:#0d1420;border-radius:6px;overflow:hidden;
+    border:1px solid var(--border)}
+  #progress-fill{height:100%;width:0;background:linear-gradient(90deg,#22c55e,#38bdf8);transition:width .4s}
+  .score{font-weight:700;font-size:13px;white-space:nowrap}
+  .mini{background:#1f2a37;color:var(--txt);border:1px solid var(--border);padding:7px 12px;
+    border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:650}
+  .mini.primary{background:#16a34a;border-color:#16a34a}
+  .objs{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 16px;
+    margin-bottom:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px}
+  .obj{display:flex;align-items:center;gap:9px;font-size:13px;padding:5px 0}
+  .obj .box{width:18px;height:18px;border-radius:5px;border:2px solid var(--idle);flex:none;
+    display:flex;align-items:center;justify-content:center;font-size:12px}
+  .obj.done .box{background:#22c55e;border-color:#22c55e;color:#06210f}
+  .obj.done{color:#86efac}.obj .pts{margin-left:auto;color:var(--muted);font-size:11px}
+</style>
+
+<script>
+// ===================== MINI-LMS : sign-in + progression ==================== //
+(function(){
+  const KEY='lab_student', gate=document.getElementById('gate');
+  let student=null, OBJ=[], TOTAL=0, done=new Set();
+
+  function saveLocal(){ try{localStorage.setItem(KEY,JSON.stringify(student));}catch(e){} }
+  function loadLocal(){ try{return JSON.parse(localStorage.getItem(KEY)||'null');}catch(e){return null;} }
+
+  async function loadObjectives(){
+    try{ const j=await (await fetch('lab/objectives')).json();
+      OBJ=j.objectives||[]; TOTAL=j.total||0; }catch(e){ OBJ=[]; }
+  }
+  function renderObjs(){
+    const box=document.getElementById('objs');
+    box.innerHTML=OBJ.map(o=>`<div class="obj${done.has(o.id)?' done':''}" data-id="${o.id}">
+      <span class="box">${done.has(o.id)?'✓':''}</span>${o.label}<span class="pts">${o.points} pts</span></div>`).join('');
+    const score=OBJ.filter(o=>done.has(o.id)).reduce((s,o)=>s+o.points,0);
+    document.getElementById('progress-fill').style.width=(TOTAL?100*score/TOTAL:0)+'%';
+    document.getElementById('progress-txt').textContent=`${score} / ${TOTAL}`;
+  }
+  function showApp(){
+    gate.classList.add('hidden');
+    document.getElementById('learner').style.display='flex';
+    document.getElementById('who-name').textContent=student.name;
+    document.getElementById('who-group').textContent=student.group?('· '+student.group):'';
+    (student.done||[]).forEach(d=>done.add(d));
+    renderObjs();
+  }
+
+  async function doLogin(){
+    const name=document.getElementById('g-name').value.trim();
+    const email=document.getElementById('g-email').value.trim();
+    const group=document.getElementById('g-group').value.trim();
+    const err=document.getElementById('g-err');
+    if(!name && !email){ err.textContent='Indique au moins ton nom ou ton e-mail.'; return; }
+    err.textContent='';
+    try{
+      const r=await fetch('lab/login',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({name,email,group})});
+      const j=await r.json();
+      if(!r.ok){ err.textContent=j.error||'Erreur de connexion.'; return; }
+      student={id:j.student_id, name:j.name, group:j.group, done:j.done||[]};
+      saveLocal(); showApp();
+    }catch(e){ err.textContent='Serveur injoignable. Le lab est-il démarré ?'; }
+  }
+
+  // API exposée au terminal
+  window.LAB={
+    student:()=>student,
+    async progress(objId){
+      if(!student || done.has(objId)) return;
+      done.add(objId); renderObjs();
+      try{ await fetch('lab/progress',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({student_id:student.id, objective:objId})}); }catch(e){}
+    },
+    async event(text){
+      if(!student) return;
+      try{ await fetch('lab/event',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({student_id:student.id, text})}); }catch(e){}
+    }
+  };
+
+  document.getElementById('g-go').onclick=doLogin;
+  ['g-name','g-email','g-group'].forEach(id=>document.getElementById(id)
+    .addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); }));
+  document.getElementById('objs-toggle').onclick=()=>{
+    const o=document.getElementById('objs'); o.style.display=o.style.display==='none'?'grid':'none'; };
+  document.getElementById('submit-btn').onclick=async()=>{
+    if(!student) return;
+    const btn=document.getElementById('submit-btn');
+    btn.textContent='Envoi…'; btn.disabled=true;
+    try{
+      const j=await (await fetch('lab/submit',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({student_id:student.id})})).json();
+      btn.textContent='✓ Soumis ('+j.score+'/'+j.total+')';
+      alert('Résultats soumis : '+j.score+'/'+j.total
+        + (j.emailed?'\nRapport envoyé au formateur par e-mail.':'\n(Le formateur récupérera le rapport CSV.)'));
+    }catch(e){ btn.textContent='Réessayer'; btn.disabled=false; }
+  };
+
+  (async function init(){
+    await loadObjectives();
+    student=loadLocal();
+    if(student && student.id){ showApp(); }  // session déjà ouverte
+  })();
+})();
+</script>
+</body>
+</html>

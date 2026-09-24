@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zero-Trust OT — Tableau de bord</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c232d; --border:#2b3441;
+    --txt:#e6edf3; --muted:#8b949e;
+    --it:#3b82f6; --dmz:#a855f7; --ot:#14b8a6;
+    --compromis:#ef4444; --expose:#f59e0b; --bloque:#22c55e; --neutre:#4b5563;
+    --allow:#22c55e; --deny:#ef4444;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px;line-height:1.5}
+  header{padding:18px 22px;border-bottom:1px solid var(--border);
+    display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  header h1{font-size:19px;margin:0;font-weight:650}
+  .mode{margin-left:auto;padding:5px 14px;border-radius:20px;font-weight:700;font-size:13px;
+    letter-spacing:.3px;border:1px solid var(--border)}
+  .mode.zt{background:rgba(34,197,94,.12);color:#4ade80;border-color:#22c55e55}
+  .mode.flat{background:rgba(239,68,68,.12);color:#f87171;border-color:#ef444455}
+  .mode.wait{background:var(--panel2);color:var(--muted)}
+  main{max-width:1240px;margin:0 auto;padding:20px 16px;display:grid;gap:20px;
+    grid-template-columns:1fr 380px}
+  @media(max-width:920px){main{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
+  .card h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);
+    margin:0 0 14px}
+  /* Pile Purdue */
+  .layer{display:grid;grid-template-columns:150px 1fr;gap:12px;align-items:stretch;
+    margin-bottom:8px}
+  .lvl{border-radius:8px;padding:8px 10px;font-size:12px;display:flex;flex-direction:column;
+    justify-content:center;border-left:4px solid var(--neutre)}
+  .lvl small{color:var(--muted);display:block;font-size:11px}
+  .zone-IT{border-left-color:var(--it)} .zone-DMZ{border-left-color:var(--dmz)}
+  .zone-OT{border-left-color:var(--ot)}
+  .equips{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .equip{flex:1;min-width:150px;background:var(--panel2);border:1px solid var(--border);
+    border-radius:8px;padding:10px 12px;border-left:4px solid var(--neutre);transition:.3s}
+  .equip .nm{font-weight:650;font-size:14px}
+  .equip .dt{color:var(--muted);font-size:12px}
+  .equip .st{margin-top:6px;font-size:11px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.4px}
+  .s-compromis{border-left-color:var(--compromis);background:rgba(239,68,68,.10)}
+  .s-compromis .st{color:var(--compromis)}
+  .s-expose{border-left-color:var(--expose);background:rgba(245,158,11,.10)}
+  .s-expose .st{color:var(--expose)}
+  .s-bloque{border-left-color:var(--bloque);background:rgba(34,197,94,.10)}
+  .s-bloque .st{color:var(--bloque)}
+  .s-non_atteint .st,.s-idle .st{color:var(--muted)}
+  .ctrl{font-size:11px;color:var(--muted);margin-top:5px;font-style:italic}
+  .leak{font-size:11px;color:#fca5a5;margin-top:5px;word-break:break-word}
+  /* Journal + etat */
+  .kv{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}
+  .kv:last-child{border:0}
+  .kv b{font-weight:650}
+  .pill{padding:2px 9px;border-radius:12px;font-size:12px;font-weight:700}
+  .pill.on{background:rgba(239,68,68,.15);color:#f87171}
+  .pill.off{background:rgba(34,197,94,.15);color:#4ade80}
+  .log{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;
+    max-height:340px;overflow:auto}
+  .log .row{padding:6px 8px;border-radius:6px;margin-bottom:4px;background:var(--panel2);
+    border-left:3px solid var(--neutre)}
+  .log .row.ALLOW{border-left-color:var(--allow)}
+  .log .row.DENY{border-left-color:var(--deny)}
+  .log .eff{font-weight:700}
+  .log .ALLOW .eff{color:var(--allow)} .log .DENY .eff{color:var(--deny)}
+  .log .meta{color:var(--muted)}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:4px}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:11px;height:11px;border-radius:3px;display:inline-block}
+  .hint{color:var(--muted);font-size:12.5px;margin:2px 0 0}
+  code{background:var(--panel2);padding:1px 6px;border-radius:5px;font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <h1>🛡️ Zero-Trust OT — Convergence IT/OT · modèle de Purdue</h1>
+  <span id="mode" class="mode wait">mode : …</span>
+</header>
+
+<main>
+  <div style="display:flex;flex-direction:column;gap:20px">
+    <div class="card">
+      <h2>Progression de l'attaque par couche</h2>
+      <p class="hint">Lancez <code>make attack</code> (ou <code>make legacy-attack</code>) dans un terminal, puis observez :
+         chaque couche se colore selon ce que l'attaquant a pu faire.</p>
+      <div id="stack"></div>
+      <div class="legend">
+        <span><i class="dot" style="background:var(--compromis)"></i>compromis (contrôle du procédé)</span>
+        <span><i class="dot" style="background:var(--expose)"></i>données exposées</span>
+        <span><i class="dot" style="background:var(--bloque)"></i>bloqué par un contrôle</span>
+        <span><i class="dot" style="background:var(--neutre)"></i>non atteint / au repos</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:20px">
+    <div class="card">
+      <h2>État live des équipements</h2>
+      <div id="state"></div>
+    </div>
+    <div class="card">
+      <h2>Journal des décisions du PEP/PDP</h2>
+      <div id="log" class="log"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+const LAYERS = [
+  {id:"5",   nom:"Entreprise / Internet",   zone:"IT"},
+  {id:"4",   nom:"Réseau bureautique",      zone:"IT"},
+  {id:"3.5", nom:"DMZ industrielle",        zone:"DMZ"},
+  {id:"3",   nom:"Supervision / Historian", zone:"OT"},
+  {id:"2",   nom:"Contrôle (IHM)",          zone:"OT"},
+  {id:"1",   nom:"Automates (PLC)",         zone:"OT"},
+  {id:"0",   nom:"Procédé physique",        zone:"OT"},
+];
+const EQUIPS = [
+  {id:"mail",     niveau:"5",   nom:"Messagerie",        dt:"vecteur d'hameçonnage"},
+  {id:"poste_it", niveau:"4",   nom:"Poste IT j.durand", dt:"poste bureautique"},
+  {id:"gateway",  niveau:"3.5", nom:"Passerelle PEP/PDP",dt:"conduit unique IT↔OT"},
+  {id:"scada",    niveau:"3",   nom:"SCADA / Historian", dt:"recettes, topologie"},
+  {id:"hmi",      niveau:"2",   nom:"IHM opérateur",     dt:"HMI-N2-01"},
+  {id:"plc",      niveau:"1",   nom:"Automate PLC-N1-01",dt:"vanne V-101"},
+  {id:"procede",  niveau:"0",   nom:"Vanne / cuve",      dt:"procédé physique"},
+];
+
+function buildStack(byEquip){
+  const stack = document.getElementById("stack");
+  stack.innerHTML = "";
+  for(const L of LAYERS){
+    const row = document.createElement("div"); row.className="layer";
+    const lvl = document.createElement("div");
+    lvl.className = "lvl zone-"+L.zone;
+    lvl.innerHTML = `<b>Niveau ${L.id}</b><small>${L.nom} · ${L.zone}</small>`;
+    const box = document.createElement("div"); box.className="equips";
+    const mine = EQUIPS.filter(e=>e.niveau===L.id);
+    if(!mine.length){ box.innerHTML = `<div class="equip s-idle"><div class="dt">—</div></div>`; }
+    for(const e of mine){
+      const s = byEquip[e.id];
+      const statut = s ? s.statut : "idle";
+      const el = document.createElement("div");
+      el.className = "equip s-"+statut;
+      let html = `<div class="nm">${e.nom}</div><div class="dt">${e.dt}</div>`
+               + `<div class="st">${s?labelStatut(statut):"au repos"}</div>`;
+      if(s && s.donnees && s.donnees.length)
+        html += s.donnees.map(d=>`<div class="leak">🔓 ${escapeHtml(d)}</div>`).join("");
+      if(s && s.controle) html += `<div class="ctrl">🛡️ ${escapeHtml(s.controle)}</div>`;
+      el.innerHTML = html;
+      box.appendChild(el);
+    }
+    row.appendChild(lvl); row.appendChild(box); stack.appendChild(row);
+  }
+}
+function labelStatut(s){
+  return {compromis:"compromis",expose:"données exposées",bloque:"bloqué",
+          non_atteint:"non atteint",idle:"au repos"}[s]||s;
+}
+function escapeHtml(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+async function refresh(){
+  // Rapport d'attaque -> pile Purdue
+  try{
+    const rep = await (await fetch("dashboard/report")).json();
+    const byEquip = {};
+    (rep.steps||[]).forEach(st=>{
+      const prev = byEquip[st.equipement];
+      const rank = {compromis:3,expose:2,bloque:1,non_atteint:0};
+      if(!prev || rank[st.statut] >= rank[prev.statut]) byEquip[st.equipement]=st;
+    });
+    // la passerelle est toujours "en place" quand un rapport existe
+    if(rep.steps && rep.steps.length) byEquip["gateway"]={statut:"bloque",controle:"Conduit actif — chaque flux évalué par le PDP"};
+    buildStack(byEquip);
+    const m = document.getElementById("mode");
+    if(rep.mode==="zero-trust"){m.className="mode zt";m.textContent="mode : ZERO-TRUST (segmenté)";}
+    else if(rep.mode==="reseau-plat"){m.className="mode flat";m.textContent="mode : RÉSEAU PLAT (vulnérable)";}
+    else {m.className="mode wait";m.textContent="mode : en attente d'une attaque…";buildStack({});}
+  }catch(e){ buildStack({}); }
+
+  // Etat live
+  try{
+    const s = await (await fetch("dashboard/state")).json();
+    const box = document.getElementById("state"); box.innerHTML="";
+    const plc = s.plc && s.plc.reachable ? s.plc.data : null;
+    const sc  = s.scada && s.scada.reachable ? s.scada.data : null;
+    const rows = [];
+    if(plc){
+      rows.push(["Vanne V-101", plc.valve_open
+        ? '<span class="pill on">OUVERTE ⚠</span>' : '<span class="pill off">fermée</span>']);
+      rows.push(["Ligne", plc.line_running ? "en marche" : '<span class="pill on">arrêtée</span>']);
+      rows.push(["Niveau cuve", plc.tank_level_pct+" %"]);
+      rows.push(["Température", plc.temperature_C+" °C (cons. "+plc.setpoint_C+")"]);
+      rows.push(["Pression", plc.pressure_bar+" bar"]);
+      rows.push(["Débit", plc.flow_m3h+" m³/h"]);
+      if(plc.alarmes && plc.alarmes.length)
+        plc.alarmes.forEach(a=>rows.push(["⚠ Alarme", '<span class="dt" style="color:#f87171">'+a+'</span>']));
+    } else rows.push(["Automate (PLC)", '<span class="dt">injoignable depuis le conduit</span>']);
+    if(sc){
+      rows.push(["Température SCADA", sc.temperature_C+" °C"]);
+      rows.push(["Pression", sc.pression_bar+" bar"]);
+      rows.push(["Recettes stockées", sc.nb_recettes]);
+    } else rows.push(["SCADA", '<span class="dt">injoignable</span>']);
+    box.innerHTML = rows.map(([k,v])=>`<div class="kv"><b>${k}</b><span>${v}</span></div>`).join("");
+  }catch(e){}
+
+  // Journal PEP
+  try{
+    const a = await (await fetch("dashboard/audit?limit=40")).json();
+    const box = document.getElementById("log");
+    const es = (a.entries||[]).slice().reverse();
+    box.innerHTML = es.length ? es.map(e=>`
+      <div class="row ${e.effect}">
+        <span class="eff">${e.effect}</span>
+        <span> · ${escapeHtml(e.action||"?")} → ${escapeHtml(e.target||"?")}</span>
+        <div class="meta">${escapeHtml(e.role||"anonyme")} · zone ${escapeHtml(e.source_zone||"?")}
+          · ${escapeHtml(e.principle||"")}</div>
+      </div>`).join("") : '<div class="dt" style="color:var(--muted)">Aucune décision pour l’instant.</div>';
+  }catch(e){}
+}
+refresh();
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>

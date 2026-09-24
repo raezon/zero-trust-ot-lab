@@ -1,0 +1,29 @@
+name: zt-ot-lab-legacy
+
+# Un seul reseau "flat" : tout le monde parle a tout le monde.
+# C'est le "chateau-fort" : une fois a l'interieur, aucun obstacle.
+networks:
+  flat:
+
+services:
+  scada:
+    build: ./services/scada
+    networks: [flat]
+    restart: unless-stopped
+
+  plc:
+    build: ./services/plc
+    networks: [flat]
+    ports:
+      - "8081:8000"
+    restart: unless-stopped
+
+  attacker:
+    build: ./attacker
+    environment:
+      PLC_URL: http://plc:8000       # DIRECTEMENT joignable -> attaque reussie
+      SCADA_URL: http://scada:8000   # idem : reseau plat, tout est accessible
+      GATEWAY_URL: http://gateway:8000
+    networks: [flat]
+    profiles: ["attack"]
+    restart: "no"

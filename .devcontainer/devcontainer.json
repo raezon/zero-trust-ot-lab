@@ -1,0 +1,41 @@
+{
+  "name": "Zero-Trust OT Lab",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-azuretools.vscode-docker",
+        "charliermarsh.ruff",
+        "ms-python.python"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/bin/python3",
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": true,
+        "[python]": {
+          "editor.formatOnSave": true,
+          "editor.defaultFormatter": "charliermarsh.ruff"
+        }
+      }
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/postCreateCommand.sh",
+  "forwardPorts": [8088, 8081],
+  "portsAttributes": {
+    "8088": {
+      "label": "Gateway (PEP/PDP)",
+      "onAutoForward": "notify"
+    },
+    "8081": {
+      "label": "PLC (legacy mode)",
+      "onAutoForward": "notify"
+    }
+  },
+  "remoteUser": "vscode",
+  "remoteEnv": {
+    "LAB_MODE": "zero-trust"
+  }
+}

@@ -1,0 +1,44 @@
+name: zt-ot-lab
+
+# Chaque reseau Docker = une ZONE (au sens IEC 62443).
+# Un service ne "voit" que les zones auxquelles il est rattache : c'est la
+# microsegmentation. La passerelle est le SEUL service present dans plusieurs
+# zones -> elle est l'unique CONDUIT entre IT et OT.
+networks:
+  it_zone:          # niveaux 4-5 : postes bureautiques, IT
+  dmz:              # DMZ industrielle
+  ot_supervision:   # niveau 3 : SCADA / historian
+  ot_terrain:       # niveaux 0-1 : automates (PLC), procede
+
+services:
+  gateway:
+    build: ./services/gateway
+    environment:
+      SCADA_URL: http://scada:8000
+      PLC_URL: http://plc:8000
+      LAB_MODE: zero-trust
+    networks: [it_zone, dmz, ot_supervision, ot_terrain]
+    ports:
+      - "8088:8000"          # expose le PEP a l'hote (tests curl)
+    restart: unless-stopped
+
+  scada:
+    build: ./services/scada
+    networks: [ot_supervision]   # joignable UNIQUEMENT via la passerelle
+    restart: unless-stopped
+
+  plc:
+    build: ./services/plc
+    networks: [ot_terrain]       # joignable UNIQUEMENT via la passerelle
+    restart: unless-stopped
+
+  attacker:
+    build: ./attacker
+    environment:
+      GATEWAY_URL: http://gateway:8000
+      PLC_URL: http://plc:8000       # NON resolvable depuis it_zone -> injoignable
+      SCADA_URL: http://scada:8000   # idem : hors de portee de la zone IT
+      STOLEN_TOKEN: tok-admin-it
+    networks: [it_zone]            # l'attaquant ne partage AUCUN reseau avec plc/scada
+    profiles: ["attack"]
+    restart: "no"
