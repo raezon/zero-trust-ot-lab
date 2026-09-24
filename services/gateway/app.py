@@ -46,6 +46,7 @@ LAST_REPORT: dict = {}
 _HERE = pathlib.Path(__file__).parent
 DASHBOARD_HTML = (_HERE / "dashboard.html").read_text(encoding="utf-8")
 ARCHITECTURE_HTML = (_HERE / "architecture.html").read_text(encoding="utf-8")
+LEADERBOARD_HTML = (_HERE / "leaderboard.html").read_text(encoding="utf-8")
 
 
 class CommandIn(BaseModel):
@@ -211,6 +212,30 @@ def lab_report_json(code: str = ""):
         return JSONResponse(status_code=403,
                             content={"error": "code formateur invalide (?code=...)"})
     return {"total": progress.TOTAL, "students": progress.all_records()}
+
+
+@app.get("/leaderboard", response_class=HTMLResponse)
+def leaderboard_page():
+    """Tableau de classement des étudiants (scores et temps)."""
+    return LEADERBOARD_HTML
+
+
+@app.get("/leaderboard.json")
+def leaderboard_json():
+    """Données du classement (scores, temps, soumissions)."""
+    records = progress.all_records()
+    return [
+        {
+            "name": r.get("name", "Anonyme"),
+            "email": r.get("email", ""),
+            "group": r.get("group", ""),
+            "score": r.get("score", 0),
+            "total": progress.TOTAL,
+            "submitted_at": r.get("submitted_at"),
+            "objectifs": list(r.get("objectifs", {}).keys()),
+        }
+        for r in records
+    ]
 
 
 @app.post("/flat/command")
