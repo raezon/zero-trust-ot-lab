@@ -1,141 +1,292 @@
-# Zero-Trust OT Lab — AtlantIndustries
+# 🔐 Zero-Trust OT Lab — AtlantIndustries
 
-> TP guidé et **déployable** pour le Chapitre 4 — *Zero-Trust & cybersécurité industrielle OT*
-> (M2 BLOC 2 — Architecture & Cybersécurité).
+<div align="center">
 
-Ce dépôt transforme le TP « papier » en **projet réel** : deux environnements
-conteneurisés que les étudiants démarrent, attaquent, puis sécurisent. La
-segmentation n'est pas simulée dans du texte — ce sont de **vrais réseaux
-Docker isolés**, et la passerelle est un **vrai PEP/PDP** (NIST SP 800-207)
-dont chaque règle est rattachée à l'un des cinq principes du cours.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED.svg)](https://www.docker.com/)
+[![Status](https://img.shields.io/badge/Status-Active-brightgreen.svg)]()
+[![Contributions](https://img.shields.io/badge/Contributions-Welcome-0066cc.svg)](#contributions)
 
----
+**Plateforme pédagogique interactif pour maîtriser la segmentation réseau et le Zero-Trust dans l'OT industriel**
 
-## Le pitch pédagogique
+[🚀 Démarrer](#démarrage-rapide) • [📚 Documentation](#documentation) • [🎯 Architecture](#architecture) • [💻 Codespaces](#codespaces)
 
-| Mode | Fichier | Ce que l'étudiant observe |
-|------|---------|---------------------------|
-| **Réseau plat** (château-fort) | `docker-compose.legacy.yml` | Un poste IT compromis atteint **directement** l'automate → la vanne s'ouvre. Échec de sécurité. |
-| **Zero-Trust** (segmenté) | `docker-compose.yml` | La même attaque est **bloquée deux fois** : par la segmentation réseau, puis par la politique du PEP. |
-
-Le contraste entre les deux commandes `make legacy-attack` / `make attack`
-est le cœur du TP.
+</div>
 
 ---
 
-## Architecture (mode Zero-Trust)
+## 📋 Table des matières
+
+- [Vue d'ensemble](#vue-densemble)
+- [Caractéristiques principales](#caractéristiques-principales)
+- [Architecture](#architecture)
+- [Démarrage rapide](#démarrage-rapide)
+- [Modes de déploiement](#modes-de-déploiement)
+- [Interface graphique](#interface-graphique)
+- [Structure du projet](#structure-du-projet)
+- [Documentation](#documentation)
+
+---
+
+## 🎯 Vue d'ensemble
+
+Ce projet transforme un **TP papier** en environnement **réel et déployable** pour le cours *Chapitre 4 — Zero-Trust & Cybersécurité Industrielle OT* (M2 BLOC 2).
+
+Les étudiants ne simulent pas — ils manipulent de **vrais réseaux Docker isolés** et une **vraie passerelle Zero-Trust** (PEP/PDP selon NIST SP 800-207).
+
+### 🎓 Le contraste pédagogique
+
+| Mode | Configuration | Résultat de l'attaque |
+|------|---------------|----------------------|
+| **Château-fort** (réseau plat) | `docker-compose.legacy.yml` | ❌ Vanne ouverte directement |
+| **Zero-Trust** (segmenté) | `docker-compose.yml` | ✅ Bloquée deux fois : réseau + politique |
+
+---
+
+## ✨ Caractéristiques principales
+
+✅ **4 réseaux Docker isolés** (zones Purdue)  
+✅ **PEP/PDP fonctionnel** (authentification + politiques + audit)  
+✅ **Terminal interactif pédagogique** pour jouer l'attaque  
+✅ **Tableau de bord live** avec logs d'audit en JSON  
+✅ **Rapport de progression** CSV/JSON pour le formateur  
+✅ **GitHub Codespaces ready** (auto-start, zéro config)  
+✅ **Tests unitaires** sur le moteur de politique  
+
+---
+
+## 🏗️ Architecture
 
 ```
-        it_zone                dmz            ot_supervision      ot_terrain
-   ┌──────────────┐                                                          
-   │  attacker    │─────┐                                                    
-   │ (poste IT    │     │                                                    
-   │  compromis)  │     ▼                                                    
-   └──────────────┘  ┌─────────────────────────────────────────────────┐   
-                     │              gateway  (PEP + PDP)                │   
-                     │  authentifie · évalue la politique · journalise │   
-                     └───────┬─────────────────────────┬───────────────┘   
-                             │                          │                   
-                             ▼                          ▼                   
-                       ┌───────────┐              ┌───────────┐             
-                       │   scada   │              │    plc    │             
-                       │ (niveau 3)│              │(niveau 1) │             
-                       └───────────┘              └───────────┘             
+┌─────────────────────────────────────────────────────────────────┐
+│                     it_zone (Bureau IT)                          │
+│  ┌────────────────┐                                              │
+│  │  attacker 🔓   │─────┐                                        │
+│  │ (poste compromis)    │                                        │
+│  └────────────────┘     │                                        │
+└─────────────────────────┼──────────────────────────────────────┘
+                          │
+                          ▼
+        ┌──────────────────────────────────────┐
+        │  🔐 gateway (PEP/PDP)                │
+        │ • Authentifie                        │
+        │ • Évalue politique                   │
+        │ • Journalise (audit)                │
+        └──────┬──────────────────┬───────────┘
+               │                  │
+      ┌────────▼────┐     ┌───────▼──────┐
+      │ SCADA (Lvl3)│     │ PLC (Lvl 0-1)│
+      │  ot_super   │     │  ot_terrain  │
+      └─────────────┘     └──────────────┘
 ```
 
-Chaque réseau Docker est une **zone** ; la passerelle est le **seul conduit**.
-`attacker` ne partage aucun réseau avec `plc`/`scada` : il *doit* passer par le
-PEP, où la politique l'arrête. Détail complet dans [`docs/00-architecture.md`](docs/00-architecture.md).
+**Chaque réseau Docker = une ZONE (au sens IEC 62443)**
+- `it_zone` : Postes bureautiques, IT
+- `dmz` : DMZ industrielle
+- `ot_supervision` : Serveurs SCADA (niveau 3)
+- `ot_terrain` : Automates PLC (niveaux 0-1)
+
+La **passerelle est le SEUL conduit** entre les zones. Pas de communication directe.
 
 ---
 
-## Démarrage rapide
+## 🚀 Démarrage rapide
 
 ### Prérequis
-- Docker + Docker Compose v2 (`docker compose version`)
-- (Optionnel, pour les tests unitaires hors Docker) Python 3.11+ et `pytest`
 
-### 1. Le monde d'avant : réseau plat
+- 🐳 Docker + Docker Compose v2
+- 💻 Bash / Terminal
+- ☁️ (Optionnel) GitHub Codespaces
+- 🐍 (Optionnel) Python 3.11+ pour les tests locaux
+
+### Installation locale
+
 ```bash
-make legacy-up          # démarre scada + plc sur un réseau unique
-make legacy-attack      # l'attaquant ouvre la vanne DIRECTEMENT
+git clone https://github.com/raezon/zero-trust-ot-lab.git
+cd zero-trust-ot-lab
+```
+
+### Mode 1: Réseau plat (vulnérable)
+
+```bash
+# Démarrer
+make legacy-up
+
+# Attaquer (dans un autre terminal)
+make legacy-attack
+
+# Arrêter
 make legacy-down
 ```
 
-### 2. Le monde d'après : Zero-Trust
+**Résultat:** L'attaquant ouvre la vanne **directement** ❌
+
+### Mode 2: Zero-Trust (sécurisé)
+
 ```bash
-make up                 # démarre les 4 zones + la passerelle PEP/PDP
-make attack             # la même attaque est bloquée
-make logs               # observe les décisions du PDP (journal JSON)
+# Démarrer (auto-start services)
+make up
+
+# Attaquer (dans un autre terminal)
+make attack
+
+# Voir les logs en temps réel
+make logs
+
+# Arrêter
 make down
 ```
 
-### 3. Les vues graphiques (mode Zero-Trust démarré)
+**Résultat:** L'attaque est **bloquée** ✅
 
-La passerelle sert **deux pages web** (le lab doit tourner : `make up`) :
+---
 
-**a) Schéma d'architecture animé — http://localhost:8088/**
+## ☁️ Codespaces
 
-Le **plan du réseau** (postes, serveur mail, ERP/AD, passerelle, SCADA,
-historian, IHM, automate, vanne) disposé selon les **niveaux de Purdue**. On
-**lance l'attaque** et on regarde la **trame du pirate se propager de nœud en
-nœud** : hameçonnage → poste IT compromis → tentative directe stoppée par un
-**mur de segmentation** → passage par la passerelle → **DENY** du PDP. Un
-bouton bascule entre **Réseau plat** (l'attaque va jusqu'à ouvrir la vanne) et
-**Zero-Trust** (elle est bloquée). Boutons *Lancer / Étape suivante / Rejouer*.
-Sous le schéma, un **terminal d'attaque interactif** (bac à sable pédagogique)
-permet à l'étudiant de **jouer l'attaque lui-même**, branché sur la **vraie
-passerelle** — chaque commande déclenche une **vraie décision du PDP** et le
-schéma réagit en direct. Il suit les commentaires : `mission`, `scan`, `whoami`,
-puis tente `open valve`. À chaque refus, le motif indique **quel principe
-Zero-Trust** l'a bloqué et un **indice** guide l'**escalade** (changer de rôle
-`use`, de zone `set zone`, de posture `set posture`) jusqu'à comprendre ce qu'il
-faut réunir pour réussir. Il **récupère du butin réel** : télémétrie des
-capteurs (`read sensors`), métriques (`read metrics`), état du procédé — tandis
-que les données d'ingénierie (recettes, programme automate) restent, elles,
-**protégées** (aucun rôle ne les obtient via le conduit).
+**Meilleure option pour les étudiants — zéro installation.**
 
-> **Données réelles.** L'automate simule un vrai procédé (cuve, température,
-> pression, débit) qui **évolue dans le temps** et **réagit aux commandes** :
-> capteurs `LT-101 / TT-102 / PT-103 / FT-104`, alarmes de sécurité, ouverture
-> de vanne qui provoque une chute de pression et un déversement, etc.
+### Créer un Codespace
 
-Cette page nécessite seulement la passerelle (et l'automate/SCADA pour les
-données live du terminal) : idéale pour une démo ou une soutenance.
+1. Va sur: https://github.com/raezon/zero-trust-ot-lab
+2. `Code` → `Codespaces` → `Create codespace on main`
+3. **Attends ~2 minutes** (services démarrent auto en background)
 
-**b) Tableau de bord live — http://localhost:8088/live**
+### Commandes dans Codespaces
 
-Branché sur le **vrai lab**. Il s'actualise toutes les 2 s et montre, couche
-par couche : le **statut de chaque équipement**, les **données exposées**, le
-**contrôle qui a bloqué**, l'**état live** (vanne, métriques SCADA) et le
-**journal ALLOW / DENY** du PEP en temps réel. Lancez `make attack` dans un
-terminal et regardez la pile se remplir.
-
-> Les deux pages sont servies **par la passerelle** : elles n'existent qu'en
-> mode Zero-Trust. Pour le contraste « réseau plat » côté conteneurs,
-> `make legacy-attack` montre dans la **console** la vanne réellement ouverte
-> (aucune passerelle pour arbitrer) — et la page (a) le rejoue visuellement via
-> son bouton *Réseau plat*.
-
-### 4. Vérifier la politique sans Docker
 ```bash
-make test               # 7 tests unitaires sur le moteur de décision
+# Vérifier l'état des services
+docker compose ps
+
+# Voir les logs
+docker compose logs -f gateway
+
+# Lancer l'attaque
+make attack
+
+# Accéder au dashboard
+# http://localhost:8088/dashboard
 ```
 
-### Tester la passerelle à la main (mode Zero-Trust démarré)
+---
+
+## 💡 Modes de déploiement
+
+| Plateforme | Effort | Temps | Idéal pour |
+|---|---|---|---|
+| **GitHub Codespaces** | ⭐ Zéro | 2 min | Étudiants, démo |
+| **Local (Docker)** | ⭐ Très bas | 5 min | Dev, testing |
+| **Oracle Always Free** | ⭐⭐ Bas | 10 min | Démo publique |
+| **Play with Docker** | ⭐ Zéro | 2 min | Test 4h max |
+
+---
+
+## 🎬 Interface graphique
+
+### 1. Architecture Animée
+
+**URL:** `http://localhost:8088/`
+
+Schéma du réseau selon les niveaux de Purdue. Lancez l'attaque et regardez :
+- La trame pirate se propager
+- La segmentation la bloquer
+- Le PDP évaluer la politique
+
+![placeholder-architecture](https://via.placeholder.com/800x400?text=Architecture+Animée)
+
+**Features:**
+- 🎮 Bascule Réseau plat ↔ Zero-Trust
+- ⚡ Terminal interactif (jouer l'attaque vous-même)
+- 📊 Missions pédagogiques guidées
+
+### 2. Tableau de bord Live
+
+**URL:** `http://localhost:8088/dashboard`
+
+Mise à jour toutes les 2 secondes :
+- État des équipements
+- Données exposées
+- Décisions PEP/PDP (ALLOW/DENY)
+- Journal d'audit JSON
+
+![placeholder-dashboard](https://via.placeholder.com/800x400?text=Tableau+de+Bord+Live)
+
+### 3. Rapport étudiant
+
+**Accès:** Interne au terminal interactif
+
+- Progression en temps réel
+- Note sur 100
+- 9 objectifs à valider
+
+---
+
+## 📁 Structure du projet
+
+```
+zero-trust-ot-lab/
+├── README.md
+├── Makefile                      # Raccourcis (up, attack, test, logs)
+├── docker-compose.yml            # Mode ZERO-TRUST
+├── docker-compose.legacy.yml     # Mode RÉSEAU PLAT
+├── .devcontainer/                # Config GitHub Codespaces
+│   ├── devcontainer.json
+│   ├── postCreateCommand.sh      # Auto-start services
+│   └── README.md
+├── docs/
+│   ├── 00-architecture.md        # Topologie réseau détaillée
+│   ├── 01-enonce-tp.md           # Énoncé étudiant
+│   ├── 02-corrige.md             # Corrigé formateur
+│   └── 03-guide-terminal-debutant.md
+├── services/
+│   ├── gateway/                  # PEP + PDP
+│   │   ├── app.py                # API FastAPI
+│   │   ├── policies.py           # Moteur de décision
+│   │   ├── identities.py         # IAM
+│   │   ├── dashboard.html        # UI interactive
+│   │   └── Dockerfile
+│   ├── scada/                    # Serveur SCADA
+│   │   └── app.py
+│   └── plc/                      # Automate industriel
+│       └── app.py
+├── attacker/                     # Scénario mouvement latéral
+│   ├── attack.py
+│   └── Dockerfile
+└── tests/                        # Tests unitaires pytest
+    └── test_policies.py
+```
+
+---
+
+## 📚 Documentation
+
+### Pour les formateurs
+
+- [**Architecture détaillée**](docs/00-architecture.md) — Zones, conduits, flux PEP/PDP
+- [**Corrigé**](docs/02-corrige.md) — Attentes et solutions
+
+### Pour les étudiants
+
+- [**Énoncé du TP**](docs/01-enonce-tp.md) — Tâches et missions
+- [**Guide débutant**](docs/03-guide-terminal-debutant.md) — Pentest pas-à-pas
+
+### API Reference
+
+**Commandes curl** sur la passerelle (mode Zero-Trust actif) :
+
 ```bash
-# Opérateur OT légitime depuis la supervision -> ALLOW
-curl -s localhost:8088/command \
+# Opérateur OT légitime -> ALLOW
+curl -X POST http://localhost:8088/command \
   -H "Authorization: Bearer tok-operator-ot" \
   -H "X-Source-Zone: ot_supervision" \
   -H "X-Device-Posture: managed" \
   -H "Content-Type: application/json" \
   -d '{"target":"plc","action":"OPEN_VALVE"}' | jq
 
-# Jeton IT volé -> DENY (moindre privilège)
-curl -s localhost:8088/command \
+# Administrateur IT, zone interdite -> DENY
+curl -X POST http://localhost:8088/command \
   -H "Authorization: Bearer tok-admin-it" \
-  -H "X-Source-Zone: it" \
+  -H "X-Source-Zone: it_zone" \
   -H "X-Device-Posture: unmanaged" \
   -H "Content-Type: application/json" \
   -d '{"target":"plc","action":"OPEN_VALVE"}' | jq
@@ -143,46 +294,81 @@ curl -s localhost:8088/command \
 
 ---
 
-## Structure du dépôt
+## 🔑 Variables d'environnement
 
+Crée un `.env` depuis `.env.example` :
+
+```bash
+cp .env.example .env
 ```
-zero-trust-ot-lab/
-├── README.md
-├── Makefile                      # raccourcis : up / attack / test / logs ...
-├── docker-compose.yml            # mode ZERO-TRUST (4 zones segmentées)
-├── docker-compose.legacy.yml     # mode RÉSEAU PLAT (vulnérable)
-├── .env.example
-├── docs/
-│   ├── 00-architecture.md        # zones/conduits, mapping Purdue, flux PEP/PDP
-│   ├── 01-enonce-tp.md           # énoncé étudiant (à distribuer)
-│   ├── 02-corrige.md             # corrigé formateur
-│   └── 03-guide-terminal-debutant.md  # pentest guidé pas-à-pas (débutants)
-├── services/
-│   ├── gateway/                  # PEP + PDP
-│   │   ├── policies.py           #   moteur de décision (pur, testé)
-│   │   ├── identities.py         #   IAM simulé (jetons + TTL)
-│   │   └── app.py                #   API HTTP (FastAPI)
-│   ├── scada/                    # supervision niveau 3
-│   └── plc/                      # automate niveau 1 (la « vanne »)
-├── attacker/                     # scénario de mouvement latéral IT→OT
-└── tests/                        # pytest sur le moteur de politique
+
+Configurables :
+- `LAB_MODE` : `zero-trust` | `legacy`
+- `INSTRUCTOR_CODE` : Code d'accès formateur (défaut: `prof`)
+- `REPORT_TO` : E-mail pour rapports (optionnel, SMTP requis)
+
+---
+
+## 🧪 Tests
+
+### Unitaires (sans Docker)
+
+```bash
+pip install -r tests/requirements.txt
+pytest tests/ -v
+```
+
+Tests le moteur de politique indépendamment.
+
+### Intégration (avec Docker)
+
+```bash
+make up
+# Tests automatiques inclus dans docker-compose.yml
+make logs
 ```
 
 ---
 
-## Correspondance avec le cours
+## 📊 Correspondance cours ↔ Projet
 
-| Notion du Chapitre 4 | Où elle vit dans le projet |
-|----------------------|----------------------------|
-| Modèle de Purdue (niveaux 0-5) | réseaux Docker `it_zone` / `dmz` / `ot_supervision` / `ot_terrain` |
-| DMZ industrielle / zones et conduits | topologie réseau ; la passerelle est le conduit unique |
-| PEP / PDP (NIST SP 800-207) | `services/gateway/app.py` + `policies.py` |
-| Vérifier explicitement | authentification du jeton (`identities.py`) + posture appareil |
-| Moindre privilège | matrice `RBAC` dans `policies.py` |
-| Supposer la compromission | refus des commandes procédé venant de la zone IT |
-| Vérifier en continu | TTL du jeton + journal d'audit JSON |
-| Convergence IT/OT | scénario `attacker/attack.py` |
+| Concept | Implémentation |
+|---------|---|
+| Modèle Purdue (niveaux 0-5) | Réseaux Docker: `it_zone`, `dmz`, `ot_supervision`, `ot_terrain` |
+| Zones et conduits | Topologie réseau; passerelle = seul conduit |
+| PEP/PDP (NIST 800-207) | `services/gateway/` |
+| Vérifier explicitement | Authentification jeton + posture appareil |
+| Moindre privilège | Matrice RBAC dans `policies.py` |
+| Supposer compromission | Refus commandes depuis zone IT |
+| Vérifier continuellement | TTL jeton + audit JSON continu |
+| Scénario réaliste | Mouvement latéral IT → OT via `attacker/` |
 
-> ⚠️ **Cadre d'usage** : environnement de laboratoire à but pédagogique.
-> Les « attaques » sont de simples requêtes HTTP vers des services simulés,
-> les jetons sont en clair : à n'utiliser que dans ce lab isolé.
+---
+
+## 🤝 Contributions
+
+Les contributions sont bienvenues! Ouvrez une issue ou un PR.
+
+---
+
+## ⚠️ Avertissement
+
+**Cadre pédagogique uniquement.** Les jetons sont en clair et les attaques sont simulées. À n'utiliser que dans un environnement de laboratoire isolé.
+
+---
+
+## 📞 Support
+
+- 📧 Email: amardjebabla10@gmail.com
+- 🐛 Issues: [GitHub Issues](https://github.com/raezon/zero-trust-ot-lab/issues)
+- 📖 Docs: Voir le dossier `docs/`
+
+---
+
+<div align="center">
+
+**Made with ❤️ for Industrial Security Education**
+
+[⬆ Back to top](#-zero-trust-ot-lab--atlantindustries)
+
+</div>
