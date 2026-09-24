@@ -106,17 +106,37 @@
     <span><i class="dot" style="background:var(--safe)"></i>procédé protégé</span>
   </div>
 
-  <!-- ================= TERMINAL INTERACTIF ================= -->
-  <div class="term">
-    <div class="term-head">
-      <span class="tdot r"></span><span class="tdot y"></span><span class="tdot g"></span>
-      <span class="term-title">Terminal de l'attaquant · poste compromis de j.durand — bac à sable pédagogique</span>
-      <span class="term-sess" id="sess"></span>
+  <!-- ================= DEUX TERMINAUX (contraste) ================= -->
+  <p class="term-intro">Deux mondes, <b>les mêmes commandes</b>. À gauche un
+     <b style="color:#f87171">réseau plat</b> (château-fort) : tout réussit, les données fuient.
+     À droite le <b style="color:#4ade80">Zero-Trust</b> : il faut prouver qui vous êtes,
+     d'où, avec quel appareil — et passer la <b>MFA</b>. Le bouton en haut met en avant
+     le monde choisi.</p>
+  <div class="terminals">
+    <!-- ① Réseau plat -->
+    <div class="term flat" id="term-flat">
+      <div class="term-head">
+        <span class="tdot r"></span><span class="tdot y"></span><span class="tdot g"></span>
+        <span class="term-title">① RÉSEAU PLAT — accès direct, aucune sécurité</span>
+      </div>
+      <div class="term-body" id="out-flat"></div>
+      <div class="term-input">
+        <span class="ps1 red" id="ps1-flat">attaquant@reseau-plat:~$</span>
+        <input id="cmd-flat" autocomplete="off" spellcheck="false" placeholder="tapez  help  puis  open valve …">
+      </div>
     </div>
-    <div class="term-body" id="out"></div>
-    <div class="term-input">
-      <span class="ps1" id="ps1">atk@poste-jdurand:~$</span>
-      <input id="cmd" autocomplete="off" spellcheck="false" placeholder="tapez  help  puis  mission  pour démarrer…">
+    <!-- ② Zero-Trust -->
+    <div class="term zt" id="term-zt">
+      <div class="term-head">
+        <span class="tdot r"></span><span class="tdot y"></span><span class="tdot g"></span>
+        <span class="term-title">② ZERO-TRUST — passerelle PEP/PDP + MFA</span>
+        <span class="term-sess" id="sess"></span>
+      </div>
+      <div class="term-body" id="out"></div>
+      <div class="term-input">
+        <span class="ps1" id="ps1">atk@poste-jdurand:~$</span>
+        <input id="cmd" autocomplete="off" spellcheck="false" placeholder="tapez  help  puis  mission …">
+      </div>
     </div>
   </div>
 </div>
@@ -138,7 +158,17 @@
   #cmd{flex:1;background:transparent;border:0;outline:0;color:var(--txt);font:inherit;font-size:13px}
   .l-ok{color:#4ade80}.l-deny{color:#f87171}.l-info{color:#7dd3fc}.l-warn{color:#fbbf24}
   .l-cmd{color:#e6edf3}.l-muted{color:#8b949e}.l-loot{color:#fca5a5}.l-hint{color:#a78bfa}
+  .l-explain{color:#93c5fd}.l-mfa{color:#fbbf24}
   .term-body b{color:#fff}
+  .term-intro{margin:22px 0 10px;color:var(--muted);font-size:13.5px;line-height:1.5}
+  .terminals{display:flex;gap:14px;align-items:stretch}
+  @media(max-width:900px){.terminals{flex-direction:column}}
+  .terminals .term{flex:1;margin-top:0;min-width:0;transition:opacity .3s,box-shadow .3s}
+  .term.flat{border-color:#ef444455}.term.flat .term-head{background:#1a1012}
+  .term.zt{border-color:#22c55e55}.term.zt .term-head{background:#0f1a12}
+  .ps1.red{color:#f87171}
+  .term.dim{opacity:.45}
+  .term.focus{box-shadow:0 0 0 2px #3b82f6}
 </style>
 
 <script>
@@ -147,9 +177,23 @@
   const out=document.getElementById('out'), inp=document.getElementById('cmd'),
         sessEl=document.getElementById('sess');
   const S={token:null, role:null, zone:'it', posture:'unmanaged'};
+  const MFA={required:new Set(['tok-operator-ot']), code:'135790', ok:false, pending:null};
   const KNOWN={  // "butin" d'identifiants récupérés sur le poste (démo)
     'tok-admin-it':'admin_it (IT)', 'tok-operator-ot':'operator_ot (OT)',
     'tok-maintenance':'maintenance (prestataire)', 'tok-expire':'operator_ot (EXPIRÉ)'};
+  // Explication simple de chaque commande (affichée avant exécution).
+  const EXPLAIN={
+    'read metrics':"lire les mesures affichées par la supervision (SCADA).",
+    'read sensors':"lire les capteurs de terrain de l'automate (niveau, température…).",
+    'read state':"lire l'état complet du procédé.",
+    'read program':"tenter de voler le programme interne de l'automate (secret industriel).",
+    'export recipes':"tenter d'exfiltrer les recettes de fabrication (secret industriel).",
+    'read topology':"tenter de cartographier le réseau industriel.",
+    'open valve':"commander physiquement l'ouverture de la vanne V-101.",
+    'close valve':"refermer la vanne V-101.",
+    'stop line':"arrêter la ligne de production (sabotage).",
+    'start line':"redémarrer la ligne de production.",
+  };
   const hist=[]; let hi=0;
 
   function line(txt,cls){ const d=document.createElement('div'); if(cls)d.className=cls;
@@ -176,6 +220,7 @@
   <b>whoami</b>               que vaut mon jeton (interroge l'IAM)
   <b>scan</b>                 sonde le réseau depuis ce poste (segmentation)
   <b>use</b> &lt;jeton&gt;          endosse un jeton volé
+  <b>mfa</b> &lt;code&gt;           valider l'authentification forte (comptes OT)
   <b>set zone</b> &lt;zone&gt;      it | dmz | ot_supervision | ot_terrain
   <b>set posture</b> &lt;p&gt;      managed | unmanaged
   <b>read metrics|sensors|state|program</b>   tenter une lecture
@@ -252,6 +297,11 @@ Chaque refus vous dit QUEL principe Zero-Trust vous bloque.`, 'l-muted');
 
   async function command(action,target){
     if(!S.token){ line("Aucun jeton. Faites  use tok-admin-it", 'l-warn'); return; }
+    if(MFA.required.has(S.token) && !MFA.ok){
+      line("🔐 MFA requise pour le compte '"+S.token+"' avant toute action.", 'l-mfa');
+      line("   Tapez :  mfa "+MFA.code+"   (le facteur supplémentaire, principe « vérifier explicitement »)", 'l-mfa');
+      return;
+    }
     let body={target,action,params:{}};
     if(action==='SET_SETPOINT') body.params.value=window.__sp||90;
     try{
@@ -286,12 +336,12 @@ Chaque refus vous dit QUEL principe Zero-Trust vous bloque.`, 'l-muted');
       if(action==='OPEN_VALVE'){ setNode('plc','compromis'); setNode('valve','compromis'); flash('valve');
         caption('danger','<b>Action physique réussie</b> : la vanne V-101 est ouverte. Le pirate contrôle le procédé.');
         prog('attaque_physique'); }
-      else if(action==='READ_SENSORS'){ prog('exfiltration'); }
       else if(action==='STOP_LINE'){ setNode('plc','compromis'); flash('plc');
         caption('danger','<b>Sabotage</b> : la ligne de production est arrêtée.'); }
       else if(procede){ setNode('plc','compromis'); }
       else { setNode(target,'expose'); flash(target);
-        caption('warn','<b>Données exposées</b> : lecture autorisée pour ce rôle — le pirate exfiltre de la télémétrie.'); }
+        caption('warn','<b>Données exposées</b> : lecture autorisée pour ce rôle — le pirate exfiltre de la télémétrie.');
+        if(action==='READ_SENSORS') prog('exfiltration'); }
     }catch(e){ line("Passerelle injoignable : "+e.name, 'l-deny'); }
   }
 
@@ -306,16 +356,30 @@ Chaque refus vous dit QUEL principe Zero-Trust vous bloque.`, 'l-muted');
     if(low==='scan'){ await scan(); return; }
     if(low==='status'){ line(`jeton=${S.token||'—'} rôle=${S.role||'—'} zone=${S.zone} posture=${S.posture}`,'l-info'); return; }
     if(low==='clear'){ out.innerHTML=''; return; }
-    if(low==='reset'){ S.token=S.role=null; S.zone='it'; S.posture='unmanaged'; updSess();
+    if(low==='reset'){ S.token=S.role=null; S.zone='it'; S.posture='unmanaged'; MFA.ok=false; updSess();
       line("Session réinitialisée (jeton IT volé, zone it, poste unmanaged).",'l-info'); return; }
+    if(low.startsWith('mfa ')){ const code=c.slice(4).trim();
+      if(!S.token || !MFA.required.has(S.token)){ line("Aucune MFA requise pour ce compte.",'l-warn'); return; }
+      if(code===MFA.code){ MFA.ok=true; line("✓ MFA validée : second facteur confirmé.", 'l-ok');
+        line("# vous pouvez maintenant tenter :  open valve",'l-hint'); }
+      else line("✗ Code MFA invalide. Réessayez :  mfa "+MFA.code, 'l-deny');
+      return; }
     if(low.startsWith('use ')){ const t=c.slice(4).trim();
       if(!KNOWN[t]){ line("Jeton inconnu. Voir  tokens",'l-warn'); return; }
-      S.token=t; S.role=KNOWN[t]; updSess(); line(`Jeton endossé : ${t} (${KNOWN[t]})`,'l-ok');
-      line("# vérifiez-le :  whoami",'l-hint'); return; }
-    if(low.startsWith('set zone ')){ S.zone=c.slice(9).trim(); updSess(); line(`zone = ${S.zone}`,'l-ok'); return; }
-    if(low.startsWith('set posture ')){ S.posture=c.slice(12).trim(); updSess(); line(`posture = ${S.posture}`,'l-ok'); return; }
-    if(low.startsWith('set setpoint ')){ window.__sp=parseFloat(c.slice(13))||90; await command('SET_SETPOINT','plc'); return; }
-    if(CMDS[low]){ await command(CMDS[low].a, CMDS[low].t); return; }
+      S.token=t; S.role=KNOWN[t]; MFA.ok=false; updSess(); line(`Jeton endossé : ${t} (${KNOWN[t]})`,'l-ok');
+      if(MFA.required.has(t)){ prog('escalade_role');
+        line("🔐 Ce compte OT est protégé par une MFA (authentification forte).", 'l-mfa');
+        line("   Un code à usage unique a été envoyé à l'application de l'opérateur.", 'l-mfa');
+        line("   Validez-le :  mfa "+MFA.code+"   (en vrai il changerait toutes les 30 s)", 'l-mfa'); }
+      else line("# vérifiez-le :  whoami",'l-hint');
+      return; }
+    if(low.startsWith('set zone ')){ S.zone=c.slice(9).trim(); updSess(); line(`zone = ${S.zone}`,'l-ok');
+      if(S.zone==='ot_supervision'||S.zone==='ot_terrain') prog('escalade_zone'); return; }
+    if(low.startsWith('set posture ')){ S.posture=c.slice(12).trim(); updSess(); line(`posture = ${S.posture}`,'l-ok');
+      if(S.posture==='managed') prog('escalade_posture'); return; }
+    if(low.startsWith('set setpoint ')){ line("ℹ modifier la consigne de chauffe (peut déclencher une alarme).",'l-explain');
+      window.__sp=parseFloat(c.slice(13))||90; await command('SET_SETPOINT','plc'); return; }
+    if(CMDS[low]){ if(EXPLAIN[low]) line("ℹ "+EXPLAIN[low],'l-explain'); await command(CMDS[low].a, CMDS[low].t); return; }
     line(`commande inconnue : ${c} — tapez  help`, 'l-warn');
   }
 
@@ -328,6 +392,97 @@ Chaque refus vous dit QUEL principe Zero-Trust vous bloque.`, 'l-muted');
   updSess();
   line("Poste de j.durand compromis. Session ouverte avec un jeton IT volé.", 'l-info');
   line("Tapez  <b>help</b>  pour les commandes, ou  <b>mission</b>  pour le scénario.", 'l-muted');
+})();
+</script>
+
+<script>
+// ============ TERMINAL ① RÉSEAU PLAT (aucune sécurité, tout réussit) ======== //
+(function(){
+  const out=document.getElementById('out-flat'), inp=document.getElementById('cmd-flat');
+  const CMDS={
+    'read metrics':{a:'READ_METRICS',t:'scada'}, 'read sensors':{a:'READ_SENSORS',t:'plc'},
+    'read state':{a:'READ_STATE',t:'plc'},       'read program':{a:'READ_PROGRAM',t:'plc'},
+    'export recipes':{a:'EXPORT_RECIPES',t:'scada'}, 'read topology':{a:'READ_TOPOLOGY',t:'scada'},
+    'open valve':{a:'OPEN_VALVE',t:'plc'},       'close valve':{a:'CLOSE_VALVE',t:'plc'},
+    'stop line':{a:'STOP_LINE',t:'plc'},         'start line':{a:'START_LINE',t:'plc'},
+  };
+  const EXPLAIN={
+    'read metrics':"lire les mesures de la supervision.",
+    'read sensors':"lire les capteurs de l'automate.",
+    'read state':"lire l'état complet du procédé.",
+    'read program':"voler le programme interne de l'automate.",
+    'export recipes':"exfiltrer les recettes de fabrication.",
+    'read topology':"cartographier le réseau industriel.",
+    'open valve':"ouvrir physiquement la vanne V-101.",
+    'close valve':"refermer la vanne.", 'stop line':"arrêter la production.",
+    'start line':"redémarrer la production.",
+  };
+  const hist=[]; let hi=0;
+  function line(txt,cls){ const d=document.createElement('div'); if(cls)d.className=cls;
+    d.innerHTML=txt; out.appendChild(d); out.scrollTop=out.scrollHeight; }
+
+  function help(){
+    line("Réseau plat : PAS d'authentification, PAS de politique. Tout passe.", 'l-info');
+    line(
+`  <b>read metrics | sensors | state | program</b>   lire
+  <b>export recipes | read topology</b>            exfiltrer
+  <b>open valve | close valve | stop line | start line</b>   agir
+  <b>set setpoint</b> &lt;C&gt; · <b>clear</b>`, 'l-muted');
+  }
+  function loot(res){
+    if(res.message) line("  » "+res.message, 'l-warn');
+    if(res.capteurs){ line("  BUTIN — capteurs :", 'l-loot');
+      res.capteurs.forEach(c=>line(`     ${c.tag}  ${c.type} = ${c.valeur} ${c.unite}`,'l-loot')); }
+    if(res.metrics){ line("  BUTIN — métriques :", 'l-loot');
+      for(const k in res.metrics) line(`     ${k} = ${res.metrics[k]}`,'l-loot'); }
+    if(res.program){ line("  BUTIN — PROGRAMME AUTOMATE VOLÉ :", 'l-loot');
+      line("     "+res.program.nom, 'l-loot');
+      (res.program.rungs||[]).forEach(r=>line("     • "+r,'l-loot')); }
+    if(res.recipes){ line("  BUTIN — RECETTES DE FABRICATION VOLÉES :", 'l-loot');
+      res.recipes.forEach(r=>line(`     ${r.id} — ${r.produit} (${r.temp_C}C, ${r.debit_m3h} m³/h)`,'l-loot')); }
+    if(res.topology){ line("  BUTIN — TOPOLOGIE RÉSEAU OT :", 'l-loot');
+      line("     "+JSON.stringify(res.topology), 'l-loot'); }
+    if(res.state){ const s=res.state;
+      line(`  état procédé : cuve ${s.tank_level_pct}% · ${s.temperature_C}C · ${s.pressure_bar}bar`, 'l-muted');
+      if(s.alarmes&&s.alarmes.length) s.alarmes.forEach(a=>line("  ⚠ "+a,'l-deny')); }
+  }
+  async function exec(action,target){
+    try{
+      const r=await fetch('flat/command',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({target,action,params:{value:window.__spf||90}})});
+      const j=await r.json();
+      line("ALLOW (aucun contrôle) · accès direct à "+target, 'l-deny');
+      loot(j.result||{});
+    }catch(e){ line("Ressource injoignable : "+e.name, 'l-warn'); }
+  }
+  async function run(raw){
+    const c=raw.trim(); if(!c) return;
+    line(`<span class="l-muted">attaquant@reseau-plat:~$</span> <span class="l-cmd">${c.replace(/</g,'&lt;')}</span>`);
+    const low=c.toLowerCase();
+    if(low==='help'){ help(); return; }
+    if(low==='clear'){ out.innerHTML=''; return; }
+    if(low.startsWith('set setpoint ')){ window.__spf=parseFloat(c.slice(13))||90;
+      line("ℹ "+"changer la consigne de chauffe.",'l-explain'); await exec('SET_SETPOINT','plc'); return; }
+    if(CMDS[low]){ if(EXPLAIN[low]) line("ℹ "+EXPLAIN[low],'l-explain'); await exec(CMDS[low].a,CMDS[low].t); return; }
+    line("commande inconnue : "+c+" — tapez help", 'l-warn');
+  }
+  inp.addEventListener('keydown',async e=>{
+    if(e.key==='Enter'){ const v=inp.value; inp.value=''; if(v.trim()){hist.push(v);hi=hist.length;} await run(v); }
+    else if(e.key==='ArrowUp'){ if(hi>0){hi--;inp.value=hist[hi]||'';} e.preventDefault(); }
+    else if(e.key==='ArrowDown'){ if(hi<hist.length){hi++;inp.value=hist[hi]||'';} e.preventDefault(); }
+  });
+  line("Vous êtes sur le MÊME réseau que l'usine. Aucun garde, aucun mot de passe.", 'l-info');
+  line("Essayez directement :  open valve   puis   export recipes   ·   help", 'l-muted');
+
+  // Met en avant le terminal correspondant au mode choisi en haut de page.
+  function focus(mode){
+    const f=document.getElementById('term-flat'), z=document.getElementById('term-zt');
+    if(mode==='flat'){ f.classList.add('focus'); f.classList.remove('dim'); z.classList.add('dim'); z.classList.remove('focus'); }
+    else { z.classList.add('focus'); z.classList.remove('dim'); f.classList.add('dim'); f.classList.remove('focus'); }
+  }
+  document.querySelectorAll('.modes button').forEach(b=>b.addEventListener('click',
+    ()=>focus(b.dataset.mode==='flat'?'flat':'zt')));
+  focus('zt');
 })();
 </script>
 

@@ -10,6 +10,9 @@ networks:
   ot_supervision:   # niveau 3 : SCADA / historian
   ot_terrain:       # niveaux 0-1 : automates (PLC), procede
 
+volumes:
+  lab_data:         # resultats/notes des etudiants (survit aux redemarrages)
+
 services:
   gateway:
     build: ./services/gateway
@@ -17,9 +20,19 @@ services:
       SCADA_URL: http://scada:8000
       PLC_URL: http://plc:8000
       LAB_MODE: zero-trust
+      DATA_DIR: /data                       # persistance des resultats etudiants
+      REPORT_TO: amardjebabla10@gmail.com   # destinataire du rapport de notes
+      INSTRUCTOR_CODE: prof                  # code pour telecharger le rapport
+      # --- Envoi e-mail (optionnel) : decommenter et renseigner pour activer ---
+      # SMTP_HOST: smtp.gmail.com
+      # SMTP_PORT: "587"
+      # SMTP_USER: ton.adresse@gmail.com
+      # SMTP_PASS: mot_de_passe_application_google   # PAS ton mot de passe habituel
     networks: [it_zone, dmz, ot_supervision, ot_terrain]
     ports:
       - "8088:8000"          # expose le PEP a l'hote (tests curl)
+    volumes:
+      - lab_data:/data
     restart: unless-stopped
 
   scada:

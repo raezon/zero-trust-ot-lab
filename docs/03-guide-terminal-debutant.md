@@ -61,8 +61,17 @@ dit pourquoi. C'est toute la démonstration.
    ```
 2. **Ouvre la page** dans ton navigateur : <http://localhost:8088/>
 3. Si tu avais déjà la page ouverte, **recharge sans cache** : `Ctrl + Shift + R`.
+4. **Connecte-toi** : un écran te demande ton **nom, e-mail et groupe**. Ce n'est
+   pas un mot de passe — c'est juste pour **enregistrer ta progression et ta
+   note**, qui seront transmises au formateur. Remplis puis clique
+   *« Commencer l'exercice »*.
 
-Tu vois :
+Une fois connecté, un bandeau en haut affiche ta **note (sur 100)** et une barre
+de progression qui montent quand tu réussis les objectifs. Le bouton
+**« Objectifs »** liste tout ce que tu dois accomplir ; **« Soumettre ma note »**
+envoie ton résultat quand tu as terminé.
+
+Tu vois aussi :
 - **en haut**, le **schéma de l'usine** (les ordinateurs, la passerelle, l'automate, la vanne), rangés par niveaux ;
 - **en bas**, une **zone noire** : c'est **le terminal**. C'est là que tu tapes.
 

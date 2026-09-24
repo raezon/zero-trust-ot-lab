@@ -213,6 +213,37 @@ def lab_report_json(code: str = ""):
     return {"total": progress.TOTAL, "students": progress.all_records()}
 
 
+@app.post("/flat/command")
+async def flat_command(body: CommandIn):
+    """
+    CHEMIN NON SECURISE — simule un RESEAU PLAT (chateau-fort).
+
+    Il n'y a AUCUNE politique, AUCUNE authentification : la requete est relayee
+    DIRECTEMENT a la ressource, comme si l'attaquant partageait le meme reseau.
+    Sert uniquement a montrer le contraste avec le chemin Zero-Trust (/command).
+    """
+    base = TARGETS.get(body.target)
+    if base is None:
+        return JSONResponse(status_code=404,
+                            content={"error": f"cible inconnue: {body.target}"})
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            r = await client.post(f"{base}/execute",
+                                  json={"action": body.action, "params": body.params})
+        upstream = r.json()
+    except Exception as exc:
+        return JSONResponse(status_code=502,
+                            content={"error": "ressource injoignable", "detail": str(exc)})
+    AUDIT_LOG.append({
+        "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "effect": "ALLOW", "principle": "AUCUNE (reseau plat)",
+        "reason": "Acces direct sans controle.", "user": "attaquant", "role": "-",
+        "action": body.action, "target": body.target,
+        "source_zone": "flat", "device_posture": "-",
+    })
+    return {"decision": "NO_POLICY", "result": upstream}
+
+
 @app.post("/command")
 async def command(
     body: CommandIn,
