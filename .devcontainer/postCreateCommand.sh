@@ -17,39 +17,49 @@ if [ -f "tests/requirements.txt" ]; then
     pip3 install -q -r tests/requirements.txt
 fi
 
+# 🚀 Auto-start the lab in background
+echo "🚀 Starting Zero-Trust OT Lab services in background..."
+docker compose up -d > /tmp/compose.log 2>&1 &
+COMPOSE_PID=$!
+
+# Wait a bit for services to start initializing
+sleep 5
+
 # Display welcome message
 clear
 cat << 'EOF'
 
 ╔════════════════════════════════════════════════════════════╗
-║        🔐 Zero-Trust OT Lab - Codespaces Ready 🔐          ║
+║     🔐 Zero-Trust OT Lab - AUTO-STARTING 🔐                ║
+║                                                            ║
+║     Services launching in background...                   ║
 ╚════════════════════════════════════════════════════════════╝
 
-Quick start commands:
+⏳ STATUS: Starting (check below)
 
-  📦 Start lab (zero-trust mode):
-     $ make up
+Check if services are ready:
+  $ docker compose ps
+  $ docker compose logs -f gateway
 
-  🏃 Start lab + attack simulation:
-     $ make up
-     $ make attack
-
-  🕵️  Legacy mode (flat network - vulnerable):
-     $ make legacy-up
-     $ make legacy-attack
-
-  🛑 Stop everything:
-     $ make down
-
-  📊 View gateway dashboard:
-     → http://localhost:8088/dashboard
-
-  🔗 Gateway API:
-     → http://localhost:8088/api/docs
+🌐 WHEN READY (usually 30-60 seconds):
+  📊 Dashboard:    http://localhost:8088/dashboard
+  🔗 API Docs:     http://localhost:8088/api/docs
+  ⚙️  Gateway:      http://localhost:8088/command
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-📚 Docs:
+Run attack simulation (once services are ready):
+  $ make attack
+
+Stop all services:
+  $ make down
+
+Restart services:
+  $ docker compose restart
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📚 Documentation:
   • Architecture:  docs/00-architecture.md
   • TP Statement:  docs/01-enonce-tp.md
   • Solution:      docs/02-corrige.md
@@ -59,4 +69,4 @@ Happy hacking! 🎯
 EOF
 
 echo ""
-echo "✅ Setup complete. Run 'make up' to start the lab."
+echo "💡 Tip: Run 'docker compose ps' to see service status"
