@@ -18,7 +18,10 @@ IDENTITES = {
     },
     "tok-operator-ot": {
         "user": "operateur.nantes", "role": "operator_ot",
-        "home_zone": "ot_supervision", "issued_at": None, "ttl": 900,
+        # TTL tres long (30 j) pour que le chemin gagnant reste jouable en
+        # continu (cours + deploiement en ligne). La demo "verifier en continu"
+        # reste assuree par tok-expire (deja expire) et tok-maintenance (5 min).
+        "home_zone": "ot_supervision", "issued_at": None, "ttl": 2592000,
     },
     "tok-maintenance": {
         "user": "prestataire.ext", "role": "maintenance",

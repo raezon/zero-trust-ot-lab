@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Documentation — Zero-Trust OT</title>
+<style>
+  :root{
+    --bg:#0b0f16; --panel:#141b25; --panel2:#0d1420; --border:#26303d;
+    --txt:#e6edf3; --muted:#8b949e; --accent:#38bdf8;
+    --ok:#4ade80; --deny:#f87171; --hint:#a78bfa; --loot:#fca5a5; --mfa:#fbbf24; --explain:#93c5fd;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.6;font-size:15.5px}
+  header{position:sticky;top:0;z-index:10;background:rgba(11,15,22,.92);backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  header h1{font-size:16px;margin:0;font-weight:650}
+  nav{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+  nav a{color:var(--muted);text-decoration:none;font-size:13px;font-weight:600;padding:6px 12px;
+    border:1px solid var(--border);border-radius:20px;background:var(--panel)}
+  nav a:hover{color:var(--txt);border-color:var(--accent)}
+  nav a.here{color:#7dd3fc;border-color:#38bdf855;background:rgba(56,189,248,.1)}
+  main{max-width:900px;margin:0 auto;padding:26px 18px 80px}
+  h2{font-size:22px;margin:34px 0 8px;padding-top:10px;border-top:1px solid var(--border)}
+  h2:first-of-type{border-top:0}
+  h3{font-size:17px;margin:22px 0 6px;color:#cbd5e1}
+  p{margin:8px 0}
+  .lead{color:var(--muted);font-size:16px}
+  code{background:var(--panel2);border:1px solid var(--border);padding:1px 6px;border-radius:5px;
+    font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13.5px}
+  pre{background:var(--panel2);border:1px solid var(--border);border-left:3px solid var(--accent);
+    border-radius:8px;padding:12px 14px;overflow:auto;margin:10px 0}
+  pre code{background:none;border:0;padding:0;font-size:13.5px;color:#e6edf3}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin:14px 0}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:760px){.two{grid-template-columns:1fr}}
+  .flat{border-color:#ef444455}.flat h3{color:#f87171}
+  .zt{border-color:#22c55e55}.zt h3{color:#4ade80}
+  .step{display:flex;gap:12px;margin:12px 0}
+  .num{flex:none;width:28px;height:28px;border-radius:50%;background:var(--panel);border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:var(--accent)}
+  .step .body{flex:1;min-width:0}
+  .callout{border-radius:9px;padding:10px 14px;margin:10px 0;font-size:14px;border:1px solid var(--border)}
+  .hint{background:rgba(167,139,250,.1);border-color:#a78bfa55}
+  .hint b{color:var(--hint)}
+  .mfa{background:rgba(251,191,36,.1);border-color:#fbbf2455}.mfa b{color:var(--mfa)}
+  .warn{background:rgba(239,68,68,.1);border-color:#ef444455}.warn b{color:var(--deny)}
+  .ok{background:rgba(34,197,94,.1);border-color:#22c55e55}.ok b{color:var(--ok)}
+  .deny{color:var(--deny);font-weight:600}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:14px}
+  th,td{border:1px solid var(--border);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:var(--panel);color:var(--muted);font-weight:600}
+  .toc{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin:6px 0 20px}
+  .toc a{color:#7dd3fc;text-decoration:none}.toc a:hover{text-decoration:underline}
+  .toc li{margin:3px 0}
+  .pill{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;
+    background:var(--panel2);border:1px solid var(--border)}
+  .disclaimer{background:rgba(239,68,68,.08);border:1px solid #ef444455;border-radius:10px;
+    padding:12px 16px;font-size:14px;color:#fca5a5}
+</style>
+</head>
+<body>
+<header>
+  <h1>📖 Documentation du lab Zero-Trust OT</h1>
+  <nav>
+    <a href="/">🖥️ Lab</a>
+    <a href="/guide" class="here">📖 Documentation</a>
+    <a href="/live">📊 Tableau de bord</a>
+    <a href="/leaderboard">🏆 Classement</a>
+  </nav>
+</header>
+
+<main>
+  <p class="lead">Ce guide te montre <b>pas à pas</b> comment mener les attaques dans les deux
+  terminaux du lab, et te donne des <b>indices</b> à chaque blocage. Garde cette page ouverte
+  à côté du lab (<a href="/" style="color:#7dd3fc">retour au lab</a>).</p>
+
+  <div class="disclaimer">⚠️ <b>Cadre pédagogique.</b> Tout se passe dans un laboratoire simulé et
+  isolé. Les « attaques » sont de simples requêtes HTTP vers des services qui imitent une usine.
+  Ne réutilise jamais ces gestes sur un système réel sans autorisation écrite.</div>
+
+  <div class="toc">
+    <b>Sommaire</b>
+    <ul>
+      <li><a href="#demarrer">1. Démarrer & se connecter</a></li>
+      <li><a href="#deux">2. Les deux terminaux</a></li>
+      <li><a href="#flat">3. Terminal ① Réseau plat — tout réussit</a></li>
+      <li><a href="#zt">4. Terminal ② Zero-Trust — pas à pas + indices</a></li>
+      <li><a href="#indices">5. Tableau des indices (refus → que faire)</a></li>
+      <li><a href="#cmds">6. Aide-mémoire des commandes</a></li>
+      <li><a href="#retenir">7. Ce qu'il faut retenir</a></li>
+    </ul>
+  </div>
+
+  <h2 id="demarrer">1. Démarrer & se connecter</h2>
+  <ol>
+    <li>Le lab doit tourner : <code>make up</code> dans un terminal de la machine.</li>
+    <li>Ouvre <code>http://localhost:8088/</code> (recharge sans cache : <code>Ctrl+Shift+R</code>).</li>
+    <li><b>Connecte-toi</b> : saisis ton <b>nom, e-mail et groupe</b> (pas de mot de passe — c'est
+      juste pour enregistrer ta note, transmise au formateur).</li>
+  </ol>
+  <p>Un bandeau affiche ta <b>note /100</b> et ta progression. Le bouton <span class="pill">Objectifs</span>
+  liste ce que tu dois accomplir ; <span class="pill">Soumettre ma note</span> envoie ton résultat.</p>
+
+  <h2 id="deux">2. Les deux terminaux</h2>
+  <p>Les mêmes commandes, deux mondes. Le bouton <b>Réseau plat / Zero-Trust</b> en haut met en avant
+  l'un ou l'autre.</p>
+  <div class="two">
+    <div class="card flat">
+      <h3>① Réseau plat (château-fort)</h3>
+      <p>Aucune sécurité, aucun mot de passe : <b>tout réussit</b>, les données fuient. Il montre
+      l'ampleur des dégâts <b>sans</b> Zero-Trust.</p>
+    </div>
+    <div class="card zt">
+      <h3>② Zero-Trust (protégé)</h3>
+      <p>Un <b>garde</b> (la passerelle PEP/PDP) vérifie <b>identité, rôle, zone, appareil</b> et exige
+      la <b>MFA</b>. C'est ici que se fait l'exercice noté.</p>
+    </div>
+  </div>
+  <p><b>Comment taper :</b> clique dans la zone noire, écris la commande, <b>Entrée</b>. Avant chaque
+  action, une ligne <span style="color:var(--explain)">ℹ bleue</span> explique ce que fait la commande.</p>
+  <p>Couleurs : <span style="color:var(--ok)">vert = autorisé</span> ·
+  <span style="color:var(--deny)">rouge = refusé</span> ·
+  <span style="color:var(--mfa)">jaune 🔐 = MFA</span> ·
+  <span style="color:var(--hint)">violet # = indice</span> ·
+  <span style="color:var(--loot)">rose = butin volé</span>.</p>
+
+  <h2 id="flat">3. Terminal ① Réseau plat — attaque pas à pas</h2>
+  <p>Travaille dans le terminal <b>de gauche</b> (bordure rouge). Tape <b>une commande à la fois</b>,
+  appuie sur <b>Entrée</b>, lis la réponse, puis passe à la suivante. Ici il n'y a aucun garde :
+  chaque commande <b>réussit</b>.</p>
+
+  <div class="step"><div class="num">1</div><div class="body">
+    <b>Lire la mission</b>
+    <p>👉 Tape :</p><pre><code>mission</code></pre>
+    <p>🖥️ Tu verras le scénario : tu es sur le même réseau que l'usine, sans aucun obstacle.</p>
+    <p>💡 <i>Pourquoi :</i> comprendre ton objectif avant d'agir.</p>
+  </div></div>
+
+  <div class="step"><div class="num">2</div><div class="body">
+    <b>Reconnaître le réseau</b>
+    <p>👉 Tape :</p><pre><code>scan</code></pre>
+    <p>🖥️ Résultat : <code>plc … ATTEIGNABLE EN DIRECT</code>, <code>scada … ATTEIGNABLE EN DIRECT</code>.</p>
+    <p>💡 <i>Pourquoi :</i> sur un réseau plat, <b>aucune segmentation</b> : l'usine est à portée directe.</p>
+  </div></div>
+
+  <div class="step"><div class="num">3</div><div class="body">
+    <b>(Facultatif) Constater que les jetons sont inutiles</b>
+    <p>👉 Tape :</p><pre><code>whoami
+use tok-admin-it</code></pre>
+    <p>🖥️ « Aucune authentification requise » / « Jeton ignoré ».</p>
+    <p>💡 <i>Pourquoi :</i> sans politique, l'identité ne sert à rien — n'importe qui fait n'importe quoi.</p>
+  </div></div>
+
+  <div class="step"><div class="num">4</div><div class="body">
+    <b>Attaque physique : ouvrir la vanne</b>
+    <p>👉 Tape :</p><pre><code>open valve</code></pre>
+    <p>🖥️ <span class="deny">ALLOW (aucun contrôle)</span> — « VANNE V-101 OUVERTE, procédé impacté ».</p>
+    <p>💡 <i>Pourquoi :</i> l'attaquant commande directement la machine physique. C'est le pire scénario.</p>
+  </div></div>
+
+  <div class="step"><div class="num">5</div><div class="body">
+    <b>Voler les recettes (secret industriel)</b>
+    <p>👉 Tape :</p><pre><code>export recipes</code></pre>
+    <p>🖥️ <span style="color:#fca5a5">BUTIN — RECETTES DE FABRICATION VOLÉES</span> (liste des produits).</p>
+    <p>💡 <i>Pourquoi :</i> espionnage industriel : la propriété intellectuelle part sans résistance.</p>
+  </div></div>
+
+  <div class="step"><div class="num">6</div><div class="body">
+    <b>Voler le programme de l'automate</b>
+    <p>👉 Tape :</p><pre><code>read program</code></pre>
+    <p>🖥️ <span style="color:#fca5a5">BUTIN — PROGRAMME AUTOMATE VOLÉ</span> (la logique de sécurité).</p>
+    <p>💡 <i>Pourquoi :</i> connaître le programme permet de préparer une attaque ciblée (type Stuxnet).</p>
+  </div></div>
+
+  <div class="step"><div class="num">7</div><div class="body">
+    <b>Récupérer la télémétrie & saboter</b>
+    <p>👉 Tape :</p><pre><code>read sensors
+stop line</code></pre>
+    <p>🖥️ Les valeurs des capteurs, puis « LIGNE ARRÊTÉE ».</p>
+    <p>💡 <i>Pourquoi :</i> tu lis tout et tu peux interrompre la production. L'usine est à ta merci.</p>
+  </div></div>
+
+  <div class="callout warn"><b>Constat :</b> une fois « à l'intérieur » du château-fort, plus aucun
+  obstacle. Un seul poste compromis = toute l'usine tombe. Refais <b>exactement les mêmes commandes</b>
+  dans le terminal Zero-Trust (ci-dessous) pour voir la différence.</div>
+
+  <h2 id="zt">4. Terminal ② Zero-Trust — attaque pas à pas + indices</h2>
+  <p>Travaille dans le terminal <b>de droite</b> (bordure verte). Refais la <b>même attaque</b>, une
+  commande à la fois. Tu pars d'un <b>jeton IT volé</b> (compte de j.durand, rôle <code>admin_it</code>).
+  À chaque refus, lis le <b>principe violé</b> et applique l'indice.</p>
+
+  <div class="step"><div class="num">1</div><div class="body">
+    <b>Lire la mission</b>
+    <p>👉 Tape :</p><pre><code>mission</code></pre>
+    <p>🖥️ Tu verras ton objectif : atteindre le procédé et voir ce que tu peux exfiltrer.</p>
+    <p>💡 <i>Pourquoi :</i> comprendre le but avant d'agir.</p>
+  </div></div>
+
+  <div class="step"><div class="num">2</div><div class="body">
+    <b>Qui es-tu ? (identité du jeton volé)</b>
+    <p>👉 Tape :</p><pre><code>whoami</code></pre>
+    <p>🖥️ <code>j.durand · rôle admin_it · [valide]</code>.</p>
+    <p>💡 <i>Pourquoi :</i> tu as un compte IT — puissant au bureau, mais pas prévu pour l'usine.</p>
+  </div></div>
+
+  <div class="step"><div class="num">3</div><div class="body">
+    <b>Reconnaître le réseau</b>
+    <p>👉 Tape :</p><pre><code>scan</code></pre>
+    <p>🖥️ <code>gateway … ATTEIGNABLE</code> mais <code>plc / scada … INJOIGNABLES</code>.</p>
+    <div class="callout ok"><b>💡 1ʳᵉ défense — segmentation :</b> depuis le bureau, l'usine « n'existe pas ».
+    Tu es obligé de passer par la passerelle (le garde).</div>
+  </div></div>
+
+  <div class="step"><div class="num">4</div><div class="body">
+    <b>Tenter l'action physique (et échouer)</b>
+    <p>👉 Tape :</p><pre><code>open valve</code></pre>
+    <p>🖥️ <span class="deny">DENY · Moindre privilège</span> — le rôle <code>admin_it</code> n'a pas ce droit.</p>
+    <div class="callout hint"><b># Indice :</b> ce compte IT n'a que des droits de bureau. Essaie un
+    compte industriel : <code>use tok-operator-ot</code>.</div>
+  </div></div>
+
+  <div class="step"><div class="num">5</div><div class="body">
+    <b>Escalader : endosser un compte OT</b>
+    <p>👉 Tape :</p><pre><code>use tok-operator-ot</code></pre>
+    <div class="callout mfa"><b>🔐 Une MFA t'est réclamée</b> — le compte industriel exige un
+    <b>second facteur</b> (code d'application), en plus du badge. Le terminal affiche un code de démo.</div>
+    <p>💡 <i>Pourquoi :</i> principe « vérifier explicitement » — un mot de passe volé ne suffit pas.</p>
+  </div></div>
+
+  <div class="step"><div class="num">6</div><div class="body">
+    <b>Valider la MFA</b>
+    <p>👉 Tape :</p><pre><code>mfa 135790</code></pre>
+    <p>🖥️ <span style="color:#4ade80">✓ MFA validée</span>. Sans elle, aucune action n'est acceptée.</p>
+    <p>💡 <i>Pourquoi :</i> en vrai ce code change toutes les 30 s — non volable avec le simple mot de passe.</p>
+  </div></div>
+
+  <div class="step"><div class="num">7</div><div class="body">
+    <b>Réessayer l'ouverture de la vanne</b>
+    <p>👉 Tape :</p><pre><code>open valve</code></pre>
+    <p>🖥️ <span class="deny">DENY · Supposer la compromission</span> — une commande ne peut pas venir de
+    la zone <code>it</code>.</p>
+    <div class="callout hint"><b># Indice :</b> change de zone d'origine : <code>set zone ot_supervision</code>.</div>
+  </div></div>
+
+  <div class="step"><div class="num">8</div><div class="body">
+    <b>Changer de zone, puis réessayer</b>
+    <p>👉 Tape :</p><pre><code>set zone ot_supervision
+open valve</code></pre>
+    <p>🖥️ <span class="deny">DENY · Vérifier explicitement</span> — ton poste est <code>unmanaged</code>
+    (non maîtrisé).</p>
+    <div class="callout hint"><b># Indice :</b> présente un poste maîtrisé : <code>set posture managed</code>.</div>
+  </div></div>
+
+  <div class="step"><div class="num">9</div><div class="body">
+    <b>Poste maîtrisé → succès</b>
+    <p>👉 Tape :</p><pre><code>set posture managed
+open valve</code></pre>
+    <div class="callout ok"><b>🖥️ ✓ ALLOW</b> — la vanne s'ouvre, le schéma vire au rouge.
+    💡 Tu n'as réussi qu'en réunissant <b>jeton valide + MFA + rôle + zone + posture</b>.
+    Rate une seule condition → refus. <b>C'est ça, le Zero-Trust.</b></div>
+  </div></div>
+
+  <div class="step"><div class="num">10</div><div class="body">
+    <b>Ce que tu peux voler…</b>
+    <p>👉 Tape :</p><pre><code>read sensors</code></pre>
+    <p>🖥️ <span style="color:#fca5a5">BUTIN : télémétrie réelle des capteurs</span> (LT-101, TT-102…).</p>
+    <div class="callout ok"><b>💡 Pourquoi la lecture RÉUSSIT en Zero-Trust ?</b><br>
+    Ce n'est pas une faille — c'est <b>voulu</b>. Le Zero-Trust n'interdit pas tout : il applique le
+    <b>moindre privilège</b>. Le rôle que tu as endossé (<code>operator_ot</code>, et même
+    <code>admin_it</code>) a <b>légitimement le droit de LIRE</b> la télémétrie de supervision
+    (<code>READ_SENSORS</code>, <code>READ_METRICS</code> sont dans ses droits de lecture).<br><br>
+    Le Zero-Trust ne rend donc pas le jeton volé inutile : il le <b>confine</b> exactement à ce que son
+    rôle a le droit de faire. Résultat : tu obtiens de la <b>lecture</b> (peu sensible), mais
+    <b>jamais</b> le contrôle du procédé sans réunir toutes les conditions, ni les secrets d'ingénierie
+    (voir étape 11). C'est la différence entre « lire une mesure » et « prendre la main sur l'usine ».</div>
+  </div></div>
+
+  <div class="step"><div class="num">11</div><div class="body">
+    <b>…et ce que tu NE peux pas voler</b>
+    <p>👉 Tape :</p><pre><code>export recipes</code></pre>
+    <p>🖥️ <span class="deny">DENY</span> — secret industriel protégé pour TOUS les rôles.</p>
+    <div class="callout ok"><b>Leçon finale :</b> même après une escalade complète, les données
+    d'ingénierie (recettes, programme) ne fuient <b>jamais</b> par le conduit distant. Compare avec le
+    terminal ① où elles partaient sans résistance.</div>
+  </div></div>
+
+  <h2 id="indices">5. Tableau des indices — quel refus, que faire</h2>
+  <table>
+    <tr><th>Message de refus</th><th>Principe Zero-Trust</th><th>Que faire</th></tr>
+    <tr><td>Jeton absent/invalide</td><td>Vérifier explicitement</td><td><code>use tok-admin-it</code></td></tr>
+    <tr><td>Jeton expiré</td><td>Vérifier en continu</td><td>prendre un jeton non expiré</td></tr>
+    <tr><td>MFA requise</td><td>Vérifier explicitement</td><td><code>mfa 135790</code></td></tr>
+    <tr><td>Le rôle n'a pas ce droit</td><td>Moindre privilège</td><td><code>use tok-operator-ot</code></td></tr>
+    <tr><td>Commande interdite depuis cette zone</td><td>Supposer la compromission</td><td><code>set zone ot_supervision</code></td></tr>
+    <tr><td>Posture insuffisante</td><td>Vérifier explicitement</td><td><code>set posture managed</code></td></tr>
+    <tr><td>Donnée d'ingénierie refusée à tous</td><td>Moindre privilège</td><td>impossible à distance (c'est voulu)</td></tr>
+  </table>
+
+  <h2 id="cmds">6. Aide-mémoire des commandes</h2>
+  <table>
+    <tr><th>Commande</th><th>Effet</th></tr>
+    <tr><td><code>help</code> · <code>mission</code> · <code>tokens</code></td><td>aide, scénario, badges volés</td></tr>
+    <tr><td><code>whoami</code> · <code>scan</code></td><td>identité du jeton · sonde réseau</td></tr>
+    <tr><td><code>use &lt;jeton&gt;</code></td><td>endosser un badge (admin-it, operator-ot, maintenance, expire)</td></tr>
+    <tr><td><code>mfa &lt;code&gt;</code></td><td>valider l'authentification forte (démo : 135790)</td></tr>
+    <tr><td><code>set zone &lt;zone&gt;</code></td><td>it · dmz · ot_supervision · ot_terrain</td></tr>
+    <tr><td><code>set posture &lt;p&gt;</code></td><td>managed · unmanaged</td></tr>
+    <tr><td><code>read metrics|sensors|state|program</code></td><td>tenter une lecture</td></tr>
+    <tr><td><code>export recipes</code> · <code>read topology</code></td><td>tenter une exfiltration</td></tr>
+    <tr><td><code>open/close valve</code> · <code>stop/start line</code></td><td>agir sur le procédé</td></tr>
+    <tr><td><code>set setpoint &lt;C&gt;</code></td><td>changer la consigne de chauffe</td></tr>
+    <tr><td><code>status</code> · <code>clear</code> · <code>reset</code></td><td>session · nettoyer · recommencer</td></tr>
+    <tr><td><code>history</code></td><td>rappeler les commandes déjà tapées</td></tr>
+    <tr><td><code>nmap</code> · <code>ping</code> · <code>curl</code></td><td>outils réseau : montrent la segmentation (OT filtré en Zero-Trust, ouvert en réseau plat)</td></tr>
+    <tr><td><code>ls</code> · <code>pwd</code> · <code>cat &lt;fichier&gt;</code> · <code>id</code> · <code>uname</code> · <code>netstat</code></td><td>commandes système du poste compromis (simulées)</td></tr>
+  </table>
+  <div class="callout hint"><b># Astuce :</b> commence toujours par la reconnaissance —
+  <code>nmap usine</code> puis <code>curl plc</code> : tu verras la différence entre les deux mondes
+  (tout ouvert en réseau plat, tout filtré en Zero-Trust). Sur le schéma, <b>survole chaque
+  équipement</b> pour savoir ce que c'est et comment l'attaquer ; dans le panneau
+  <b>Objectifs</b>, survole chaque ligne pour l'explication et l'indice.</div>
+
+  <h2 id="retenir">7. Ce qu'il faut retenir</h2>
+  <ul>
+    <li><b>Le mot de passe volé ne suffit plus</b> : on vérifie identité + rôle + zone + posture + MFA, à chaque fois.</li>
+    <li><b>Deux barrières</b> : la segmentation réseau <i>puis</i> la politique du garde (défense en profondeur).</li>
+    <li><b>Moindre privilège</b> : un compte n'a que ses droits stricts ; un compte IT ne commande pas l'usine.</li>
+    <li><b>Supposer la compromission</b> : « être à l'intérieur » ne donne aucune confiance.</li>
+    <li><b>Traçabilité</b> : chaque décision est journalisée — visible sur le
+      <a href="/live" style="color:#7dd3fc">tableau de bord</a>.</li>
+  </ul>
+  <p class="lead" style="margin-top:24px"><a href="/" style="color:#7dd3fc">← Retour au lab pour pratiquer</a></p>
+</main>
+</body>
+</html>

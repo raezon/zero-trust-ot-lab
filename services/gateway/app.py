@@ -47,6 +47,7 @@ _HERE = pathlib.Path(__file__).parent
 DASHBOARD_HTML = (_HERE / "dashboard.html").read_text(encoding="utf-8")
 ARCHITECTURE_HTML = (_HERE / "architecture.html").read_text(encoding="utf-8")
 LEADERBOARD_HTML = (_HERE / "leaderboard.html").read_text(encoding="utf-8")
+GUIDE_HTML = (_HERE / "guide.html").read_text(encoding="utf-8")
 
 
 class CommandIn(BaseModel):
@@ -97,6 +98,12 @@ def whoami(authorization: str | None = Header(default=None)):
 def architecture():
     """Schema d'architecture anime : propagation de l'attaque IT -> OT."""
     return ARCHITECTURE_HTML
+
+
+@app.get("/guide", response_class=HTMLResponse)
+def guide():
+    """Documentation : marche a suivre pas-a-pas des attaques (avec indices)."""
+    return GUIDE_HTML
 
 
 @app.get("/live", response_class=HTMLResponse)

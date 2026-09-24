@@ -177,6 +177,57 @@
 </style>
 
 <script>
+// ============ COMMANDES LINUX / PENTEST SIMULÉES (partagées) =============== //
+// Renvoie un tableau de lignes {t,c} si `low` est une commande système connue,
+// sinon null. `mode` = 'flat' | 'zt' change le résultat des outils réseau.
+window.sysCmd=function(low, mode){
+  const R=[]; const add=(t,c)=>R.push({t,c});
+  const arg=low.split(/\s+/).slice(1).join(' ');
+  if(low==='ls'||low==='ls -la'){ add("attack.py   killchain.py   loot/   notes.txt   creds.txt   .bash_history",'l-muted'); return R; }
+  if(low==='pwd'){ add("/home/attacker",'l-muted'); return R; }
+  if(low==='id'){ add("uid=0(root) gid=0(root) groups=0(root)   # poste compromis",'l-muted'); return R; }
+  if(low==='uname'||low==='uname -a'){ add("Linux kali 6.12 #1 SMP x86_64 GNU/Linux — poste d'attaque",'l-muted'); return R; }
+  if(low==='cat notes.txt'||low==='cat creds.txt'){
+    add("# Notes de reconnaissance (hameçonnage de j.durand)",'l-muted');
+    add("jetons récupérés : tok-admin-it, tok-operator-ot, tok-maintenance",'l-loot');
+    add("cible : automate PLC-N1-01 (vanne V-101) · SCADA supervision",'l-loot'); return R; }
+  if(low==='netstat'||low==='netstat -an'){
+    add("Proto  Adresse locale        Adresse distante      État",'l-muted');
+    add("tcp    10.10.4.7:52344       gateway:8088          ESTABLISHED",'l-muted');
+    if(mode==='flat'){ add("tcp    10.10.4.7:52350       plc:8000              ESTABLISHED",'l-deny');
+      add("tcp    10.10.4.7:52351       scada:8000            ESTABLISHED",'l-deny'); }
+    return R; }
+  if(low.startsWith('ping')){
+    const h=arg||'gateway';
+    if(mode==='zt' && /plc|scada|automate|ot/.test(h)){ add(`PING ${h} : 100% packet loss — hôte injoignable (segmentation)`, 'l-ok'); }
+    else { add(`PING ${h} : 64 bytes, temps=0.4 ms — hôte joignable`, mode==='flat'?'l-deny':'l-muted'); }
+    return R; }
+  if(low.startsWith('nmap')){
+    const h=arg||'usine';
+    add(`Nmap scan report — ${h}`,'l-info');
+    if(mode==='flat'){
+      add("  8000/tcp  open   http   (plc — automate)",'l-deny');
+      add("  8000/tcp  open   http   (scada — supervision)",'l-deny');
+      add("  => tout l'OT est exposé : aucun cloisonnement.", 'l-deny');
+    } else {
+      add("  8088/tcp  open      http   (gateway / passerelle PEP)",'l-muted');
+      add("  8000/tcp  filtered  (plc)     — bloqué par la microsegmentation",'l-ok');
+      add("  8000/tcp  filtered  (scada)   — bloqué par la microsegmentation",'l-ok');
+      add("  => l'OT est INJOIGNABLE en direct : il faut passer par la passerelle.", 'l-ok');
+    }
+    return R; }
+  if(low.startsWith('curl')){
+    const t=/plc|8000\b/.test(arg)?'plc':(/scada/.test(arg)?'scada':'gateway');
+    if(mode==='zt' && (t==='plc'||t==='scada')){ add(`curl: (7) Failed to connect to ${t} — Connection refused (segmentation)`, 'l-ok'); }
+    else if(t==='gateway'){ add("curl: la passerelle répond — utilisez les commandes du lab (open valve, whoami…).",'l-muted'); }
+    else { add(`curl ${t}/execute : réponse directe (réseau plat) — utilisez  read/open  pour exploiter.`,'l-deny'); }
+    return R; }
+  if(low==='ifconfig'||low==='ip a'){ add("eth0  inet 10.10.4.7/24  (zone it — poste bureautique)",'l-muted'); return R; }
+  return null;
+};
+</script>
+
+<script>
 // ===================== TERMINAL (attaque réelle, sandbox) ================== //
 (function(){
   const out=document.getElementById('out'), inp=document.getElementById('cmd'),
@@ -232,7 +283,8 @@
   <b>export recipes | read topology</b>       tenter une exfiltration
   <b>open valve | close valve | stop line | start line</b>   agir sur le procédé
   <b>set setpoint</b> &lt;C&gt;     modifier la consigne de chauffe
-  <b>status</b>               état de session · <b>clear</b> · <b>reset</b>`, 'l-muted');
+  <b>status</b>               état de session · <b>clear</b> · <b>reset</b>
+  <b>outils :</b> history · ls · pwd · id · uname · nmap · curl · ping · cat · netstat`, 'l-muted');
   }
   function mission(){
     line("── MISSION (exercice) ──────────────────────────────", 'l-info');
@@ -316,6 +368,8 @@ Chaque refus vous dit QUEL principe Zero-Trust vous bloque.`, 'l-muted');
         body:JSON.stringify(body)});
       const j=await r.json();
       setNode('gateway','active');
+      // Animation : la trame remonte de la zone IT jusqu'à la passerelle.
+      try{ if(window.travel) travel('poste','gateway',{color:'#f87171',dur:650}); }catch(_){}
       if(r.status===403 || j.decision==='DENY'){
         line(`DENY · ${j.principle} — ${j.reason}`, 'l-deny');
         flash('gateway');
@@ -385,6 +439,9 @@ Chaque refus vous dit QUEL principe Zero-Trust vous bloque.`, 'l-muted');
     if(low.startsWith('set setpoint ')){ line("ℹ modifier la consigne de chauffe (peut déclencher une alarme).",'l-explain');
       window.__sp=parseFloat(c.slice(13))||90; await command('SET_SETPOINT','plc'); return; }
     if(CMDS[low]){ if(EXPLAIN[low]) line("ℹ "+EXPLAIN[low],'l-explain'); await command(CMDS[low].a, CMDS[low].t); return; }
+    if(low==='history'){ if(!hist.length) line("(aucune commande)",'l-muted');
+      hist.forEach((h,i)=>line("  "+(i+1)+"  "+h,'l-muted')); return; }
+    { const sys=window.sysCmd&&window.sysCmd(low,'zt'); if(sys){ sys.forEach(l=>line(l.t,l.c)); return; } }
     line(`commande inconnue : ${c} — tapez  help`, 'l-warn');
   }
 
@@ -429,10 +486,25 @@ Chaque refus vous dit QUEL principe Zero-Trust vous bloque.`, 'l-muted');
   function help(){
     line("Réseau plat : PAS d'authentification, PAS de politique. Tout passe.", 'l-info');
     line(
-`  <b>read metrics | sensors | state | program</b>   lire
+`  <b>mission</b>              le scénario (réseau plat)
+  <b>scan</b>                 sonde le réseau (ici l'OT est joignable !)
+  <b>whoami</b> · <b>tokens</b>       identité · jetons trouvés (inutiles ici)
+  <b>use</b> &lt;jeton&gt; · <b>set zone/posture</b>   acceptés mais SANS effet
+  <b>read metrics | sensors | state | program</b>   lire
   <b>export recipes | read topology</b>            exfiltrer
   <b>open valve | close valve | stop line | start line</b>   agir
-  <b>set setpoint</b> &lt;C&gt; · <b>clear</b>`, 'l-muted');
+  <b>set setpoint</b> &lt;C&gt; · <b>clear</b>
+  <b>outils :</b> history · ls · pwd · id · uname · nmap · curl · ping · cat · netstat`, 'l-muted');
+  }
+  function mission(){
+    line("── MISSION (réseau plat) ───────────────────────────", 'l-info');
+    line(
+`Vous êtes sur le MÊME réseau que l'usine (château-fort).
+Aucun garde, aucune authentification : atteignez directement le
+procédé et volez tout ce que vous pouvez.
+
+# Essayez dans l'ordre :  scan  →  open valve  →  export recipes  →  read program
+Comparez ensuite avec le terminal Zero-Trust : les mêmes commandes y seront bloquées.`, 'l-muted');
   }
   function loot(res){
     if(res.message) line("  » "+res.message, 'l-warn');
@@ -458,6 +530,17 @@ Chaque refus vous dit QUEL principe Zero-Trust vous bloque.`, 'l-muted');
       const j=await r.json();
       line("ALLOW (aucun contrôle) · accès direct à "+target, 'l-deny');
       loot(j.result||{});
+      // Animation sur le schéma : accès DIRECT (le pirate traverse sans obstacle).
+      try{
+        if(window.setNode){ setNode('poste','compromis');
+          if(window.travel) travel('poste', target==='scada'?'scada':'plc', {color:'#ef4444',dur:700});
+          if(action==='OPEN_VALVE'){ setNode('plc','compromis'); setNode('valve','compromis');
+            if(window.flash) flash('valve');
+            if(window.caption) caption('danger','<b>Réseau plat</b> : la vanne V-101 est ouverte sans le moindre obstacle.'); }
+          else if(action==='STOP_LINE'){ setNode('plc','compromis'); if(window.flash) flash('plc'); }
+          else { setNode(target,'compromis'); if(window.flash) flash(target); }
+        }
+      }catch(_){}
     }catch(e){ line("Ressource injoignable : "+e.name, 'l-warn'); }
   }
   async function run(raw){
@@ -465,10 +548,25 @@ Chaque refus vous dit QUEL principe Zero-Trust vous bloque.`, 'l-muted');
     line(`<span class="l-muted">attaquant@reseau-plat:~$</span> <span class="l-cmd">${c.replace(/</g,'&lt;')}</span>`);
     const low=c.toLowerCase();
     if(low==='help'){ help(); return; }
+    if(low==='mission'){ mission(); return; }
     if(low==='clear'){ out.innerHTML=''; return; }
+    if(low==='scan'){
+      line("Sonde du réseau depuis la machine…", 'l-info');
+      line("  gateway  … ATTEIGNABLE", 'l-deny');
+      line("  plc (automate) … ATTEIGNABLE EN DIRECT — aucune segmentation !", 'l-deny');
+      line("  scada          … ATTEIGNABLE EN DIRECT — aucune segmentation !", 'l-deny');
+      line("# tout l'OT est à portée : enchaînez  open valve", 'l-hint'); return; }
+    if(low==='whoami'){ line("Aucune authentification requise sur ce réseau : vous êtes anonyme et tout-puissant.", 'l-deny'); return; }
+    if(low==='tokens'){ line("Jetons trouvés sur le poste (INUTILES ici, aucun contrôle) :", 'l-info');
+      ['tok-admin-it','tok-operator-ot','tok-maintenance'].forEach(t=>line("  "+t, 'l-muted')); return; }
+    if(low.startsWith('use ')){ line("Jeton ignoré : le réseau plat ne vérifie aucune identité.", 'l-warn'); return; }
+    if(low.startsWith('set zone ')||low.startsWith('set posture ')){ line("Paramètre ignoré : aucune politique sur le réseau plat.", 'l-warn'); return; }
     if(low.startsWith('set setpoint ')){ window.__spf=parseFloat(c.slice(13))||90;
       line("ℹ "+"changer la consigne de chauffe.",'l-explain'); await exec('SET_SETPOINT','plc'); return; }
     if(CMDS[low]){ if(EXPLAIN[low]) line("ℹ "+EXPLAIN[low],'l-explain'); await exec(CMDS[low].a,CMDS[low].t); return; }
+    if(low==='history'){ if(!hist.length) line("(aucune commande)",'l-muted');
+      hist.forEach((h,i)=>line("  "+(i+1)+"  "+h,'l-muted')); return; }
+    { const sys=window.sysCmd&&window.sysCmd(low,'flat'); if(sys){ sys.forEach(l=>line(l.t,l.c)); return; } }
     line("commande inconnue : "+c+" — tapez help", 'l-warn');
   }
   inp.addEventListener('keydown',async e=>{
@@ -552,6 +650,21 @@ EDGES.forEach(([a,b,kind])=>{
   gEdges.appendChild(line); edgeEls[a+">"+b]=line;
 });
 
+// Info-bulle (survol) de chaque point du schéma : ce que c'est + comment l'attaquer.
+const NODE_HINT={
+  hacker:"Attaquant externe. Point de départ : il hameçonne un employé.",
+  net:"Internet : vecteur de l'e-mail piégé.",
+  mail:"Serveur de messagerie : par où arrive l'hameçonnage.",
+  poste:"Poste de j.durand (déjà compromis). C'est TON point d'appui. Terminal → whoami / scan.",
+  poste2:"Autre poste bureautique (non ciblé ici).",
+  poste3:"ERP / Active Directory : annuaire des comptes.",
+  gateway:"Passerelle PEP/PDP : le SEUL passage vers l'OT. Elle vérifie jeton, rôle, zone, posture, MFA.",
+  scada:"Supervision SCADA : recettes + métriques. Cible de lecture. Terminal → read metrics.",
+  hist:"Historian : journalisation des mesures.",
+  hmi:"IHM opérateur (salle de contrôle).",
+  plc:"Automate PLC-N1-01 : commande la vanne. Cible finale. Terminal → open valve / read sensors.",
+  valve:"Vanne V-101 (procédé physique). L'ouvrir = incident. Objectif ultime de l'attaque.",
+};
 const nodeEls={};
 for(const id in NODES){
   const n=NODES[id];
@@ -562,6 +675,8 @@ for(const id in NODES){
   const sb=el("text",{x:42,y:n.h/2+14,fill:"var(--muted)","font-size":10.5}); sb.textContent=n.sub;
   const badge=el("text",{x:n.w-8,y:15,fill:"var(--muted)","font-size":9.5,"font-weight":700,
     "text-anchor":"end","letter-spacing":".4"}); badge.textContent="";
+  const ti=el("title"); ti.textContent=(NODE_HINT[id]||n.nm); g.appendChild(ti);
+  g.setAttribute("style","cursor:help");
   g.append(r,ic,nm,sb,badge); gNodes.appendChild(g);
   nodeEls[id]={g,r,badge};
 }
@@ -762,11 +877,16 @@ reset();
   .mini.primary{background:#16a34a;border-color:#16a34a}
   .objs{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 16px;
     margin-bottom:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px}
-  .obj{display:flex;align-items:center;gap:9px;font-size:13px;padding:5px 0}
+  .obj{display:flex;align-items:center;gap:9px;font-size:13px;padding:5px 0;position:relative;cursor:help}
   .obj .box{width:18px;height:18px;border-radius:5px;border:2px solid var(--idle);flex:none;
     display:flex;align-items:center;justify-content:center;font-size:12px}
   .obj.done .box{background:#22c55e;border-color:#22c55e;color:#06210f}
   .obj.done{color:#86efac}.obj .pts{margin-left:auto;color:var(--muted);font-size:11px}
+  .obj-tip{display:none;position:absolute;bottom:calc(100% + 6px);left:0;z-index:60;width:270px;
+    background:#0d1420;border:1px solid #38bdf8;border-radius:9px;padding:10px 12px;font-size:12px;
+    line-height:1.5;color:var(--txt);box-shadow:0 8px 24px rgba(0,0,0,.55);white-space:normal;cursor:default}
+  .obj-tip b{color:#7dd3fc}.obj-tip .tip-h{color:#a78bfa;display:block;margin-top:5px}
+  .obj:hover .obj-tip{display:block}
 </style>
 
 <script>
@@ -774,6 +894,18 @@ reset();
 (function(){
   const KEY='lab_student', gate=document.getElementById('gate');
   let student=null, OBJ=[], TOTAL=0, done=new Set();
+  // Explication + indice de chaque objectif (affichés au survol).
+  const DESC={
+    reconnaissance:{d:"Sonder le réseau pour voir ce qui est atteignable depuis ton poste.",h:"Tape :  scan  (ou  nmap usine)"},
+    identite:{d:"Savoir ce que vaut le jeton volé : quel utilisateur, quel rôle.",h:"Tape :  whoami"},
+    refus_privilege:{d:"Provoquer un premier refus pour comprendre le moindre privilège.",h:"use tok-admin-it  puis  open valve"},
+    escalade_role:{d:"Endosser un compte industriel plus puissant (opérateur OT).",h:"use tok-operator-ot  puis  mfa 135790"},
+    escalade_zone:{d:"Prétendre venir d'une zone OT autorisée à commander le procédé.",h:"set zone ot_supervision"},
+    escalade_posture:{d:"Présenter un poste 'maîtrisé' exigé pour une action sensible.",h:"set posture managed"},
+    attaque_physique:{d:"Ouvrir la vanne une fois TOUTES les conditions réunies.",h:"open valve"},
+    exfiltration:{d:"Récupérer la télémétrie que ton rôle a le droit de lire.",h:"read sensors"},
+    protection_pi:{d:"Constater que les secrets d'ingénierie restent protégés pour tous.",h:"export recipes  (sera refusé)"},
+  };
 
   function saveLocal(){ try{localStorage.setItem(KEY,JSON.stringify(student));}catch(e){} }
   function loadLocal(){ try{return JSON.parse(localStorage.getItem(KEY)||'null');}catch(e){return null;} }
@@ -784,8 +916,12 @@ reset();
   }
   function renderObjs(){
     const box=document.getElementById('objs');
-    box.innerHTML=OBJ.map(o=>`<div class="obj${done.has(o.id)?' done':''}" data-id="${o.id}">
-      <span class="box">${done.has(o.id)?'✓':''}</span>${o.label}<span class="pts">${o.points} pts</span></div>`).join('');
+    box.innerHTML=OBJ.map(o=>{
+      const t=DESC[o.id]||{d:o.label,h:''};
+      return `<div class="obj${done.has(o.id)?' done':''}" data-id="${o.id}">
+        <span class="box">${done.has(o.id)?'✓':''}</span>${o.label}<span class="pts">${o.points} pts</span>
+        <span class="obj-tip"><b>${o.label}</b><br>${t.d}${t.h?`<span class="tip-h"># ${t.h}</span>`:''}</span>
+      </div>`;}).join('');
     const score=OBJ.filter(o=>done.has(o.id)).reduce((s,o)=>s+o.points,0);
     document.getElementById('progress-fill').style.width=(TOTAL?100*score/TOTAL:0)+'%';
     document.getElementById('progress-txt').textContent=`${score} / ${TOTAL}`;

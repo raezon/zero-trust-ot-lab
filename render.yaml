@@ -1,0 +1,14 @@
+# Blueprint Render : deploiement gratuit en 1 conteneur (Docker).
+# Sur render.com : New > Blueprint > connecte ce repo GitHub.
+services:
+  - type: web
+    name: zero-trust-ot-lab
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: INSTRUCTOR_CODE
+        value: prof
+      - key: REPORT_TO
+        value: amardjebabla10@gmail.com
+    # Render injecte PORT automatiquement ; start.sh le respecte.
