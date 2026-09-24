@@ -54,8 +54,8 @@
 <header>
   <h1>🛡️ Zero-Trust OT — propagation d'une attaque IT → OT (modèle de Purdue)</h1>
   <div class="modes">
-    <button data-mode="flat">Réseau plat</button>
-    <button data-mode="zt" class="on">Zero-Trust</button>
+    <button data-mode="flat" class="on">Réseau plat</button>
+    <button data-mode="zt">Zero-Trust</button>
     <a href="/guide" target="_blank" class="leaderboard-btn" title="Marche à suivre des attaques">📖 Documentation</a>
     <a href="/leaderboard" class="leaderboard-btn" title="Voir le classement">🏆 Classement</a>
   </div>
@@ -487,7 +487,7 @@ Chaque refus vous dit QUEL principe Zero-Trust vous bloque.`, 'l-muted');
   }
   document.querySelectorAll('.modes button').forEach(b=>b.addEventListener('click',
     ()=>focus(b.dataset.mode==='flat'?'flat':'zt')));
-  focus('zt');
+  focus('flat');
 })();
 </script>
 
