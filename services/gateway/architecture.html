@@ -161,14 +161,14 @@
   .l-explain{color:#93c5fd}.l-mfa{color:#fbbf24}
   .term-body b{color:#fff}
   .term-intro{margin:22px 0 10px;color:var(--muted);font-size:13.5px;line-height:1.5}
-  .terminals{display:flex;gap:14px;align-items:stretch;position:relative}
+  .terminals{display:flex;gap:14px;align-items:stretch;position:relative;width:100%}
   @media(max-width:900px){.terminals{flex-direction:column}}
-  .terminals .term{flex:1;margin-top:0;min-width:0;transition:opacity .3s,box-shadow .3s,max-height .3s,visibility .3s}
+  .terminals .term{flex:1;margin-top:0;min-width:0;width:100%;transition:opacity .3s,box-shadow .3s,max-height .3s,visibility .3s}
   .term.flat{border-color:#ef444455}.term.flat .term-head{background:#1a1012}
   .term.zt{border-color:#22c55e55}.term.zt .term-head{background:#0f1a12}
   .ps1.red{color:#f87171}
-  .term.dim{opacity:0;visibility:hidden;max-height:0;pointer-events:none}
-  .term.focus{box-shadow:0 0 0 2px #3b82f6;opacity:1;visibility:visible}
+  .term.dim{opacity:0;visibility:hidden;max-height:0;width:0;pointer-events:none}
+  .term.focus{box-shadow:0 0 0 2px #3b82f6;opacity:1;visibility:visible;width:100%}
 </style>
 
 <script>
