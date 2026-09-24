@@ -40,15 +40,20 @@ Bienvenue dans la documentation complète du lab Zero-Trust OT. Choisis ton rôl
 
 📋 **Compréhension générale du système**
 
-### ✅ [02 - Corrigé complet](02-corrige.md)
+### ✅ 02 - Corrigé complet (Solution)
 **Solutions et attentes**
+
+> ⚠️ **Réservé aux formateurs**
+> 
+> Le corrigé n'est pas disponible publiquement pour éviter les fuites.
+> Contacte les auteurs pour l'accès formateur.
 
 - Réponses aux missions
 - Explications pédagogiques
 - Pièges communs
 - Extensions possibles
 
-🎯 **Réponses et barème de notation**
+📧 **Demande l'accès: amardjebabla10@gmail.com**
 
 ---
 
