@@ -77,20 +77,41 @@ Tu vois aussi :
 
 ---
 
-## 4. Comment utiliser le terminal
+## 4. Comment utiliser les terminaux
 
-1. **Clique** dans la zone noire, sur la ligne `atk@poste-jdurand:~$`.
-2. **Tape** une commande (par exemple `help`).
-3. Appuie sur **Entrée**.
-4. La réponse s'affiche juste au-dessus.
+Tu as **deux terminaux côte à côte** — les **mêmes commandes** dans deux mondes
+différents :
+
+- **① RÉSEAU PLAT** (bordure rouge) : le « château-fort ». Aucune sécurité :
+  **tout réussit**. Tape `open valve` → la vanne s'ouvre ; `export recipes` →
+  tu voles les recettes ; `read program` → tu voles le programme de l'automate.
+  C'est le monde à **éviter**. Il te montre l'ampleur des dégâts sans Zero-Trust.
+- **② ZERO-TRUST** (bordure verte) : la même attaque, mais un **garde**
+  (la passerelle) vérifie **tout**. C'est ici que se fait **l'exercice noté**.
+
+> Le bouton **Réseau plat / Zero-Trust** en haut de page **met en avant** le
+> terminal correspondant (l'autre s'estompe).
+
+**Pour utiliser un terminal :** clique dans sa zone noire, tape une commande,
+appuie sur **Entrée**. La réponse s'affiche au-dessus.
 
 Astuces :
 - Flèches **↑ / ↓** = retrouver les commandes déjà tapées.
-- `clear` = nettoyer l'écran. `reset` = repartir de zéro (badge IT volé, zone IT, poste non maîtrisé).
+- `clear` = nettoyer l'écran. `reset` = repartir de zéro (terminal Zero-Trust).
 - Les commandes s'écrivent **en minuscules**, exactement comme indiqué.
+- Avant chaque action, une ligne **ℹ bleue** t'explique **ce que fait** la commande.
 
-> Les couleurs t'aident : **vert** = autorisé/OK, **rouge** = refusé, **violet** =
-> un *indice* pour t'aider, **rose** = du **butin** (données récupérées).
+> Les couleurs t'aident : **vert** = autorisé, **rouge** = refusé, **bleu ℹ** =
+> explication, **jaune 🔐** = MFA, **violet #** = indice, **rose** = butin volé.
+
+### La MFA (authentification forte) dans le terminal Zero-Trust
+
+Quand tu endosses un compte industriel (`use tok-operator-ot`), le système
+exige une **MFA** — un **deuxième facteur** en plus du mot de passe, comme un
+code d'application sur ton téléphone. Le terminal affiche un code de démo :
+tape `mfa 135790` pour le valider. **Sans MFA validée, aucune action n'est
+acceptée** — c'est le principe « vérifier explicitement ». (En vrai, ce code
+change toutes les 30 secondes et n'est pas volable avec le simple mot de passe.)
 
 ---
 
@@ -157,6 +178,17 @@ L'indice (en violet) t'a soufflé d'essayer un compte OT. Fais-le :
 
 ```
 use tok-operator-ot
+```
+→ Le compte industriel exige une **MFA** (authentification forte). Le terminal
+affiche un code de démo. Valide-le :
+
+```
+mfa 135790
+```
+→ **✓ MFA validée.** Sans elle, aucune action n'est acceptée : c'est un
+**deuxième facteur** en plus du badge, difficile à voler. Maintenant réessaie :
+
+```
 open valve
 ```
 → Nouvelle réponse :
@@ -164,9 +196,9 @@ open valve
 > **DENY · Supposer la compromission** — Commande procédé interdite depuis la
 > zone 'it'.
 
-**Traduction :** même avec le bon rôle, une commande vers l'usine **ne peut pas
-venir du réseau bureautique**. Le système *suppose que le poste IT est
-compromis* (c'est ton cas !) et refuse.
+**Traduction :** même avec le bon rôle **et** la MFA, une commande vers l'usine
+**ne peut pas venir du réseau bureautique**. Le système *suppose que le poste IT
+est compromis* (c'est ton cas !) et refuse.
 
 ### Étape 4 — Changer de zone
 
@@ -250,6 +282,7 @@ Essaie de deviner le résultat **avant** de taper, puis vérifie :
 | `whoami` | identité de ton badge actuel |
 | `scan` | sonde le réseau (montre la segmentation) |
 | `use <jeton>` | endosser un badge (`tok-admin-it`, `tok-operator-ot`, `tok-maintenance`, `tok-expire`) |
+| `mfa <code>` | valider l'authentification forte (démo : `mfa 135790`) |
 | `set zone <zone>` | `it`, `dmz`, `ot_supervision`, `ot_terrain` |
 | `set posture <p>` | `managed` ou `unmanaged` |
 | `read sensors` | lire les capteurs de l'automate |

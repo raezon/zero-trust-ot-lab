@@ -192,7 +192,7 @@ Schéma du réseau selon les niveaux de Purdue. Lancez l'attaque et regardez :
 - La segmentation la bloquer
 - Le PDP évaluer la politique
 
-![placeholder-architecture](https://via.placeholder.com/800x400?text=Architecture+Animée)
+<img src="docs/screenshots/architecture.png" alt="Architecture Animée" width="800">
 
 **Features:**
 - 🎮 Bascule Réseau plat ↔ Zero-Trust
@@ -209,7 +209,7 @@ Mise à jour toutes les 2 secondes :
 - Décisions PEP/PDP (ALLOW/DENY)
 - Journal d'audit JSON
 
-![placeholder-dashboard](https://via.placeholder.com/800x400?text=Tableau+de+Bord+Live)
+<img src="docs/screenshots/dashboard-live.png" alt="Tableau de bord Live" width="800">
 
 ### 3. Rapport étudiant
 
